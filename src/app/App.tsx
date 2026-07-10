@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { startAudio } from '../audio/context'
 import { ExploreView } from './views/ExploreView'
 import { SingView } from './views/SingView'
@@ -16,7 +16,7 @@ import './app.css'
  * switching modules always lands in a quiet room.
  */
 
-type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'modes' | 'songlab' | 'stats'
+type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'modes' | 'songlab' | 'jam' | 'stats'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
@@ -25,12 +25,30 @@ const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'triads', label: 'Triad Atlas' },
   { id: 'modes', label: 'Modal Colors' },
   { id: 'songlab', label: 'Song Lab' },
+  { id: 'jam', label: 'Jam Room (Spotify)' },
   { id: 'stats', label: 'Dark Spots' },
 ]
+
+// Spotify stays lazy and isolated: deleting src/integrations/spotify only
+// affects this import.
+const SpotifyView = lazy(() =>
+  import('../integrations/spotify/SpotifyView').then((m) => ({ default: m.SpotifyView })),
+)
 
 export default function App() {
   const [ready, setReady] = useState(false)
   const [module, setModule] = useState<ModuleId>('explore')
+
+  // Returning from Spotify OAuth lands on /callback: finish the token
+  // exchange, then open the Jam Room after the start gate.
+  useEffect(() => {
+    if (window.location.pathname === '/callback') {
+      void import('../integrations/spotify/auth').then(async ({ handleCallback }) => {
+        await handleCallback()
+        setModule('jam')
+      })
+    }
+  }, [])
 
   if (!ready) {
     return (
@@ -78,6 +96,11 @@ export default function App() {
       {module === 'triads' && <TriadAtlasView />}
       {module === 'modes' && <ModalColorsView />}
       {module === 'songlab' && <SongLabView />}
+      {module === 'jam' && (
+        <Suspense fallback={<div className="panel dim">tuning in…</div>}>
+          <SpotifyView />
+        </Suspense>
+      )}
       {module === 'stats' && <StatsView />}
     </div>
   )

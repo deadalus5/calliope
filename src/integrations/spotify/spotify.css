@@ -1,0 +1,43 @@
+.spotify-setup ol { color: var(--ink-dim); line-height: 1.9; }
+
+.spotify-input {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 280px;
+}
+.spotify-input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+.spotify-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.spotify-hits button { text-align: left; }
+
+.spotify-now { color: var(--good); font-size: 13px; }
+
+.spotify-tap { font-size: 18px; padding: 14px 30px; }
+
+.spotify-chartstrip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.spotify-chip {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 5px 10px;
+}
+.spotify-chip.active {
+  border-color: var(--ember);
+  color: var(--ember);
+  background: #3a2417;
+}
