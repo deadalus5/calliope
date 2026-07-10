@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { startAudio } from '../audio/context'
 import { ExploreView } from './views/ExploreView'
 import { SingView } from './views/SingView'
+import { SongLabView } from './views/SongLabView'
 import './tokens.css'
 import './app.css'
 
@@ -10,11 +11,12 @@ import './app.css'
  * navigation. Modules register here as they land in later phases.
  */
 
-type ModuleId = 'explore' | 'sing'
+type ModuleId = 'explore' | 'sing' | 'songlab'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
   { id: 'sing', label: 'Name What You Sing' },
+  { id: 'songlab', label: 'Song Lab' },
 ]
 
 export default function App() {
@@ -63,6 +65,7 @@ export default function App() {
 
       {module === 'explore' && <ExploreView />}
       {module === 'sing' && <SingView />}
+      {module === 'songlab' && <SongLabView />}
     </div>
   )
 }

@@ -1,0 +1,66 @@
+.chart {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6px;
+  margin: 8px 0 14px;
+}
+
+.chart-bar {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 6px 12px;
+  min-height: 44px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.chart-bar.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(236, 201, 120, 0.18);
+}
+
+.chart-chord {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.chart-chord.carried { color: var(--ink-faint); }
+
+.chart-beats {
+  position: absolute;
+  bottom: 4px;
+  display: flex;
+  gap: 4px;
+}
+.chart-beats i {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.chart-beats i.on { background: var(--gold); }
+
+.songlab-now {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 4px 0 8px;
+}
+
+.songlab-chord {
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--ember, #e08a5a);
+  min-width: 120px;
+}
+
+input[type='range'] {
+  accent-color: var(--gold);
+  width: 140px;
+}
