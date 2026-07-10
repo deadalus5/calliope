@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useWakeLock } from '../use-wake-lock'
 import { sequencer, type ChordChangeEvent } from '../../audio/sequencer'
 import { playMidi } from '../../audio/audition'
 import { Fretboard } from '../../fretboard/Fretboard'
@@ -41,6 +42,7 @@ export function SongLabView() {
   const countInTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countIn = useAppPrefs((s) => s.countIn)
   const setCountIn = useAppPrefs((s) => s.setCountIn)
+  useWakeLock(playing)
 
   const prog = useMemo(() => progressionById(progId), [progId])
   const mode = useMemo(() => modeById(prog.scaleHint.modeId), [prog])

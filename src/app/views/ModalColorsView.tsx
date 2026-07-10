@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useWakeLock } from '../use-wake-lock'
 import { playMelody, playMidi } from '../../audio/audition'
 import { sequencer } from '../../audio/sequencer'
 import { Fretboard } from '../../fretboard/Fretboard'
@@ -72,6 +73,7 @@ export function ModalColorsView() {
   const [huntTarget, setHuntTarget] = useState<Degree | null>(null)
   const [reveal, setReveal] = useState(false)
   const [score, setScore] = useState({ hits: 0, tries: 0 })
+  useWakeLock(vampOn)
   const micMode = useAppPrefs((s) => s.micMode)
   const micReady = useRef(false)
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

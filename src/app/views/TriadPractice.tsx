@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tone from 'tone'
+import { useWakeLock } from '../use-wake-lock'
 import { playChordAt, playMidi } from '../../audio/audition'
 import { getBand } from '../../audio/instruments'
 import { Fretboard } from '../../fretboard/Fretboard'
@@ -116,6 +117,7 @@ export function TriadPractice() {
   const [running, setRunning] = useState(false)
   const [idx, setIdx] = useState(0)
   const [countIn, setCountIn] = useState(false)
+  useWakeLock(running)
   const loop = useRef<Tone.Loop | null>(null)
   const clickSeq = useRef<Tone.Sequence | null>(null)
   const stepIdx = useRef(0)
