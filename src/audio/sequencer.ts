@@ -6,6 +6,7 @@ import {
 import { getBand } from './instruments'
 import { getMixer } from './mixer'
 import { audioNow } from './context'
+import { exposeDebug } from './debug'
 import { styleFor } from './styles'
 import { arrangeBass } from './arrange/bass'
 import { arrangeKeys } from './arrange/keys'
@@ -150,8 +151,10 @@ export class SequencerEngine {
     }
 
     // chord-change events for the UI (and drill windows)
+    const debugChordEvents: Array<{ index: number; audioTime: number }> = []
     this.parts.push(new Tone.Part(
       (time, ev: TimelineEvent & { index: number }) => {
+        if (debugChordEvents.length < 200) debugChordEvents.push({ index: ev.index, audioTime: time })
         Tone.getDraw().schedule(() => {
           const e: ChordChangeEvent = { event: ev, index: ev.index, audioTime: time }
           for (const l of this.chordListeners) l(e)
@@ -200,6 +203,24 @@ export class SequencerEngine {
       },
       beatEvents,
     ).start(0))
+
+    exposeDebug({
+      chordEvents: debugChordEvents,
+      songDebug: {
+        progressionId: progression.id,
+        bpm: t.bpm.value,
+        beatsPerBar,
+        bars: this.bars,
+        passes: PASSES,
+        timeline: this.timeline.map((e, index) => ({
+          index, bar: e.bar, beat: e.beat, durationBeats: e.durationBeats,
+        })),
+        stats: {
+          fills: drumEvents.filter((e) => e.fill).length,
+          crashes: drumEvents.filter((e) => e.art === 'crash').length,
+        },
+      },
+    })
   }
 
   play(opts?: { countIn?: boolean }): void {

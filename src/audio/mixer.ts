@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import type { DrumVoice } from './drum-voice'
+import { exposeDebug } from './debug'
 
 /**
  * The band's mix: per-instrument channels (EQ + compression where the
@@ -85,6 +86,28 @@ export function getMixer(): Mixer {
     return Array.isArray(value) ? Math.max(...value) : value
   }
 
+  // Lazy recorder for E2E/human-listening bounces — never created unless a
+  // script actually calls startRecording(), so it's a no-op in normal use.
+  let recorder: Tone.Recorder | null = null
+  function ensureRecorder(): Tone.Recorder {
+    if (!recorder) {
+      recorder = new Tone.Recorder()
+      limiter.connect(recorder)
+    }
+    return recorder
+  }
+  function startRecording(): void {
+    ensureRecorder().start()
+  }
+  async function stopRecording(): Promise<string> {
+    const blob = await ensureRecorder().stop()
+    const buf = await blob.arrayBuffer()
+    let binary = ''
+    const bytes = new Uint8Array(buf)
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    return btoa(binary)
+  }
+
   function applyTrims(trims?: Partial<Record<MixChannelId, number>>): void {
     for (const id of Object.keys(channels) as MixChannelId[]) {
       channels[id].volume.value = BASE_CHANNEL_DB[id] + (trims?.[id] ?? 0)
@@ -100,11 +123,8 @@ export function getMixer(): Mixer {
     applyTrims,
   }
 
-  // Expose for E2E (Task 9 extends this).
-  ;(globalThis as { __calliope?: Record<string, unknown> }).__calliope = {
-    ...(globalThis as { __calliope?: Record<string, unknown> }).__calliope,
-    peakDb,
-  }
+  // Expose for E2E.
+  exposeDebug({ peakDb, startRecording, stopRecording })
 
   return mixer
 }
