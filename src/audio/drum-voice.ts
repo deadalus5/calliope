@@ -28,7 +28,10 @@ export class DrumVoice {
   readonly spec: KitArticulation
   private buffers: Tone.ToneAudioBuffer[][] // [layer][rr]
   private lastRR = -1
-  private live: Tone.ToneBufferSource[] = []
+  /** src+gain pairs still ringing. Tone's OneShotSource.dispose() silences
+   * onended without calling it, so the per-hit gain must be tracked here —
+   * a closure alone would orphan it when the voice is disposed mid-ring. */
+  private live: Array<{ src: Tone.ToneBufferSource; g: Tone.Gain }> = []
 
   constructor(spec: KitArticulation, buffers: Tone.ToneAudioBuffer[][]) {
     this.spec = spec
@@ -49,13 +52,14 @@ export class DrumVoice {
       const g = new Tone.Gain(Math.pow(vel, 1.4)).connect(this.out)
       const src = new Tone.ToneBufferSource(buffer).connect(g)
       src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.01
+      const pair = { src, g }
       src.onended = () => {
         src.dispose()
         g.dispose()
-        const i = this.live.indexOf(src)
+        const i = this.live.indexOf(pair)
         if (i >= 0) this.live.splice(i, 1)
       }
-      this.live.push(src)
+      this.live.push(pair)
       src.start(time)
     } catch {
       // buffer not loaded / out-of-order transport handoff — drop the hit
@@ -63,20 +67,26 @@ export class DrumVoice {
   }
 
   choke(time: number): void {
-    for (const src of this.live) {
+    // Pairs stay tracked until onended fires (at the scheduled stop) so a
+    // dispose() landing inside the choke fade still frees every node.
+    for (const { src } of this.live) {
       try {
         src.stop(time + 0.03)
       } catch {
         // already stopped — ignore
       }
     }
-    this.live = []
   }
 
   dispose(): void {
-    for (const src of this.live) {
+    for (const { src, g } of this.live) {
       try {
         src.dispose()
+      } catch {
+        // already disposed — ignore
+      }
+      try {
+        g.dispose()
       } catch {
         // already disposed — ignore
       }
