@@ -69,12 +69,12 @@ export default function App() {
             setLoading(true)
             await startAudio()
             // decode every sample before the first note can be asked for
-            const [{ warmAudition }, { getBand }, { samplesLoaded }] = await Promise.all([
+            const [{ warmAudition }, { getBand, bandReady }, { samplesLoaded }] = await Promise.all([
               import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
             ])
             warmAudition()
             getBand()
-            await samplesLoaded()
+            await Promise.all([samplesLoaded(), bandReady()])
             setReady(true)
           }}
         >
