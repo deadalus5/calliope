@@ -5,10 +5,12 @@ import { Fretboard } from '../../fretboard/Fretboard'
 import { chordToneLayer, modeColorLayer, skeletonLayer } from '../../fretboard/build-layers'
 import type { FretboardLayer } from '../../fretboard/layers'
 import {
-  PC, PROGRESSIONS, buildTimeline, coordToMidi, modeById, normalizePc, pcName,
+  PC, PROGRESSIONS, buildTimeline, coordToMidi, degreeOf, modeById, normalizePc, pcName,
   progressionById, totalBars,
   type PitchClass, type TimelineEvent,
 } from '../../music-core'
+import { degreeColor } from '../../fretboard/palette'
+import { useBoardPrefs } from '../../state/board-prefs'
 import './songlab.css'
 
 /**
@@ -26,7 +28,7 @@ export function SongLabView() {
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState<ChordChangeEvent | null>(null)
   const [beat, setBeat] = useState<{ bar: number; beat: number } | null>(null)
-  const [showColors, setShowColors] = useState(true)
+  const [focus, setFocus] = useState<'full' | 'chord+map' | 'chord'>('chord+map')
 
   const prog = useMemo(() => progressionById(progId), [progId])
   const mode = useMemo(() => modeById(prog.scaleHint.modeId), [prog])
@@ -54,7 +56,7 @@ export function SongLabView() {
     return () => {
       unsubChord()
       unsubBeat()
-      sequencer.stop()
+      sequencer.dispose() // fully release the shared transport for other views
       setPlaying(false)
     }
   }, [])
@@ -70,11 +72,12 @@ export function SongLabView() {
   )
 
   const layers = useMemo(() => {
-    const out: FretboardLayer[] = [skeletonLayer(scaleRoot, mode.skeleton, 'all')]
-    if (showColors) out.push(modeColorLayer(scaleRoot, mode))
+    const out: FretboardLayer[] = []
+    if (focus !== 'chord') out.push(skeletonLayer(scaleRoot, mode.skeleton, 'all'))
+    if (focus === 'full') out.push(modeColorLayer(scaleRoot, mode))
     if (current && chordLayers[current.index]) out.push(chordLayers[current.index])
     return out
-  }, [scaleRoot, mode, showColors, current, chordLayers])
+  }, [scaleRoot, mode, focus, current, chordLayers])
 
   return (
     <div>
@@ -124,9 +127,20 @@ export function SongLabView() {
           <button onClick={() => { sequencer.stop(); setPlaying(false); setCurrent(null); setBeat(null) }}>
             stop
           </button>
-          <button className={showColors ? 'active' : ''} onClick={() => setShowColors(!showColors)}>
-            mode colors
-          </button>
+          <div className="control-group">
+            <span className="control-label">Show</span>
+            <div className="seg">
+              <button className={focus === 'chord' ? 'active' : ''} onClick={() => setFocus('chord')}>
+                chord only
+              </button>
+              <button className={focus === 'chord+map' ? 'active' : ''} onClick={() => setFocus('chord+map')}>
+                chord + map
+              </button>
+              <button className={focus === 'full' ? 'active' : ''} onClick={() => setFocus('full')}>
+                + mode colors
+              </button>
+            </div>
+          </div>
         </div>
 
         <p className="vibe-line">“{prog.description}”</p>
@@ -134,7 +148,7 @@ export function SongLabView() {
         <ChordChart events={timeline} bars={bars} current={current} beat={beat} keyRoot={key} />
 
         <div className="songlab-now">
-          <span className="songlab-chord">{current ? current.event.symbol : '—'}</span>
+          <ChordDisplay current={current} keyRoot={key} />
           <span className="dim">
             {mode.name} colors on the {mode.skeleton} pentatonic skeleton, key of {pcName(scaleRoot, scaleRoot)}
           </span>
@@ -143,6 +157,19 @@ export function SongLabView() {
         <Fretboard layers={layers} keyRoot={key} onNoteClick={(c) => playMidi(coordToMidi(c))} />
       </div>
     </div>
+  )
+}
+
+/** The big now-playing symbol, tinted by the chord root's degree color. */
+function ChordDisplay({ current, keyRoot }: { current: ChordChangeEvent | null; keyRoot: PitchClass }) {
+  const colorMode = useBoardPrefs((s) => s.colorMode)
+  const color = current
+    ? degreeColor(degreeOf(current.event.chord.root, keyRoot), colorMode)
+    : 'var(--ink-faint)'
+  return (
+    <span className="songlab-chord" style={{ color, textShadow: current ? `0 0 18px ${color}55` : 'none' }}>
+      {current ? current.event.symbol : '—'}
+    </span>
   )
 }
 

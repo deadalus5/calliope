@@ -39,8 +39,12 @@ export class DrumHit {
   }
 
   trigger(time: number, velocity = 1): void {
-    this.out.gain.setValueAtTime(velocity, time)
-    this.player.start(time)
+    try {
+      this.out.gain.setValueAtTime(velocity, time)
+      this.player.start(time)
+    } catch {
+      // a rare out-of-order restart during transport handoff — drop the hit
+    }
   }
 }
 

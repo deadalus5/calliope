@@ -1,0 +1,21 @@
+.tp-prompter {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-height: 54px;
+  padding: 6px 4px 12px;
+}
+
+.tp-now {
+  font-family: var(--font-display);
+  font-size: 34px;
+  color: var(--ink);
+}
+
+.tp-frets { font-size: 14px; color: var(--gold); }
+.tp-next { font-size: 15px; }
+.tp-countin {
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: var(--gold);
+}

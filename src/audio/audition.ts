@@ -28,10 +28,14 @@ export function playMidi(midi: number): void {
 
 /** Strum a set of midi notes low→high with a slight roll, like a hand would. */
 export function playChord(midis: number[], rollMs = 28): void {
+  playChordAt(midis, Tone.now(), rollMs)
+}
+
+/** Schedulable strum (audio-clock time) for transport-driven practice. */
+export function playChordAt(midis: number[], time: number, rollMs = 28): void {
   const g = ensureGuitar()
-  const now = Tone.now()
   ;[...midis].sort((a, b) => a - b).forEach((m, i) => {
-    g.triggerAttackRelease(midiToFreq(m), 2.8, now + (i * rollMs) / 1000, 0.8)
+    g.triggerAttackRelease(midiToFreq(m), 2.8, time + (i * rollMs) / 1000, 0.8)
   })
 }
 

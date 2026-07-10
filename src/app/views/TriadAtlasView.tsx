@@ -4,18 +4,18 @@ import { Fretboard } from '../../fretboard/Fretboard'
 import { gripLayer } from '../../fretboard/build-layers'
 import type { FretboardLayer } from '../../fretboard/layers'
 import {
-  PC, chord, chordPcs, coordToMidi, degreeLabel, degreeOf, identifyChord, pcName,
+  PC, chord, chordPcs, coordToMidi, degreeLabel, degreeOf, pcName,
   triadGrips, STRING_SET_NAMES,
   type PitchClass, type StringSet, type TriadGrip,
 } from '../../music-core'
+import { TriadPractice } from './TriadPractice'
 import './triadatlas.css'
 
 /**
  * Triad Atlas — triads as fragments of the chords he already owns.
- * Pick a triad and a string set; every close-voiced grip on that set is
- * laid out as an inversion ladder up the neck. His E/A anchor roots stay
- * visible so each fragment stays tied to the barre chord it came from.
- * The slash-chord builder stacks any triad over any bass he can name.
+ * Atlas tab: pick a triad and a string set; every close-voiced grip is laid
+ * out as an inversion ladder up the neck, hung from his E/A anchor roots.
+ * Practice tab: the metronome-driven shape cycler.
  */
 
 const ROOTS: PitchClass[] = [PC.E, PC.F, PC.Fs, PC.G, PC.Gs, PC.A, PC.As, PC.B, PC.C, PC.Cs, PC.D, PC.Ds]
@@ -30,6 +30,19 @@ const INVERSION_NAMES = ['root position', '1st inversion', '2nd inversion']
 const INVERSION_HINTS = ['root on the bottom', '3rd on the bottom', '5th on the bottom']
 
 export function TriadAtlasView() {
+  const [tab, setTab] = useState<'atlas' | 'practice'>('atlas')
+  return (
+    <div>
+      <div className="app-nav" style={{ marginTop: 0 }}>
+        <button className={tab === 'atlas' ? 'active' : ''} onClick={() => setTab('atlas')}>explore shapes</button>
+        <button className={tab === 'practice' ? 'active' : ''} onClick={() => setTab('practice')}>practice (metronome)</button>
+      </div>
+      {tab === 'atlas' ? <Atlas /> : <TriadPractice />}
+    </div>
+  )
+}
+
+function Atlas() {
   const [root, setRoot] = useState<PitchClass>(PC.A)
   const [qualityId, setQualityId] = useState('maj')
   const [stringSet, setStringSet] = useState<StringSet>(2)
@@ -124,93 +137,8 @@ export function TriadAtlasView() {
         />
       </div>
 
-      <SlashBuilder />
+
     </div>
   )
 }
 
-function SlashBuilder() {
-  const [bass, setBass] = useState<PitchClass>(PC.Fs)
-  const [triadRoot, setTriadRoot] = useState<PitchClass>(PC.D)
-  const [qualityId, setQualityId] = useState('maj')
-
-  const triad = useMemo(() => chord(pcName(triadRoot, triadRoot), qualityId), [triadRoot, qualityId])
-  const names = useMemo(() => identifyChord(chordPcs(triad), bass), [triad, bass])
-  const grip = useMemo(() => {
-    const gs = triadGrips(triad, 2)
-    return gs.find((g) => g.minFret >= 2) ?? gs[0]
-  }, [triad])
-
-  const bassMidi = 40 + ((bass - 4 + 12) % 12)
-
-  const layers = useMemo(() => {
-    const out: FretboardLayer[] = [{
-      id: 'slash-bass',
-      zIndex: 20,
-      markers: [{
-        coord: { string: 0, fret: (bass - 4 + 12) % 12 },
-        role: 'root', label: pcName(bass, bass), ring: true,
-      }],
-    }]
-    if (grip) out.push(gripLayer(grip, triadRoot, 'slash-triad'))
-    return out
-  }, [bass, grip, triadRoot])
-
-  return (
-    <div className="panel">
-      <h3 className="slash-title">Slash chords — a triad over a bass note you already know</h3>
-      <div className="controls">
-        <div className="control-group">
-          <span className="control-label">Bass (low E)</span>
-          <select value={bass} onChange={(e) => setBass(Number(e.target.value))}>
-            {ROOTS.map((r) => <option key={r} value={r}>{pcName(r, r)}</option>)}
-          </select>
-        </div>
-        <div className="control-group">
-          <span className="control-label">Triad on top</span>
-          <select value={triadRoot} onChange={(e) => setTriadRoot(Number(e.target.value))}>
-            {ROOTS.map((r) => <option key={r} value={r}>{pcName(r, r)}</option>)}
-          </select>
-          <div className="seg">
-            {QUALITIES.slice(0, 3).map((q) => (
-              <button key={q.id} className={qualityId === q.id ? 'active' : ''} onClick={() => setQualityId(q.id)}>
-                {q.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button
-          className="primary"
-          onClick={() => grip && playChord([bassMidi, ...grip.coords.map(coordToMidi)], 40)}
-        >
-          hear it
-        </button>
-      </div>
-
-      <div className="slash-names">
-        <span className="slash-main">
-          {pcName(triadRoot, triadRoot)}{qualityId === 'min' ? 'm' : qualityId === 'dim' ? 'dim' : ''}/{pcName(bass, bass)}
-        </span>
-        <SlashAliases
-          builtSymbol={`${pcName(triadRoot, triadRoot)}${qualityId === 'min' ? 'm' : qualityId === 'dim' ? 'dim' : ''}/${pcName(bass, bass)}`}
-          names={names.map((n) => n.symbol)}
-        />
-      </div>
-
-      <Fretboard layers={layers} keyRoot={bass} onNoteClick={(c) => playMidi(coordToMidi(c))} />
-    </div>
-  )
-}
-
-/** Alternate names for the stack, hiding ones that just repeat the slash. */
-function SlashAliases({ builtSymbol, names }: { builtSymbol: string; names: string[] }) {
-  const fresh = names.filter((n) => n !== builtSymbol)
-  if (fresh.length === 0) {
-    return <span className="slash-alias dim">no simpler name — it IS the sound</span>
-  }
-  return (
-    <span className="slash-alias dim">
-      = {fresh[0]}{fresh[1] ? ` (also ${fresh[1]})` : ''}
-    </span>
-  )
-}

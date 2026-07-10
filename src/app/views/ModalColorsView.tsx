@@ -107,7 +107,7 @@ export function ModalColorsView() {
 
   // stop everything when leaving or switching modes
   useEffect(() => () => {
-    sequencer.stop()
+    sequencer.dispose() // fully release the shared transport for other views
     noteTracker.stop()
     stopPitchEngine()
     if (nextTimer.current) clearTimeout(nextTimer.current)

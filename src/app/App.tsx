@@ -5,6 +5,7 @@ import { SingView } from './views/SingView'
 import { SongLabView } from './views/SongLabView'
 import { EarGymView } from './views/EarGymView'
 import { TriadAtlasView } from './views/TriadAtlasView'
+import { SlashGuideView } from './views/SlashGuideView'
 import { ModalColorsView } from './views/ModalColorsView'
 import { StatsView } from './views/StatsView'
 import { BoardOptions } from '../fretboard/BoardOptions'
@@ -17,13 +18,14 @@ import './app.css'
  * switching modules always lands in a quiet room.
  */
 
-type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'modes' | 'songlab' | 'jam' | 'stats'
+type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'slash' | 'modes' | 'songlab' | 'jam' | 'stats'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
   { id: 'sing', label: 'Name What You Sing' },
   { id: 'eargym', label: 'Ear Gym' },
   { id: 'triads', label: 'Triad Atlas' },
+  { id: 'slash', label: 'Slash Chords' },
   { id: 'modes', label: 'Modal Colors' },
   { id: 'songlab', label: 'Song Lab' },
   { id: 'jam', label: 'Jam Room (Spotify)' },
@@ -107,6 +109,7 @@ export default function App() {
       {module === 'sing' && <SingView />}
       {module === 'eargym' && <EarGymView />}
       {module === 'triads' && <TriadAtlasView />}
+      {module === 'slash' && <SlashGuideView />}
       {module === 'modes' && <ModalColorsView />}
       {module === 'songlab' && <SongLabView />}
       {module === 'jam' && (
