@@ -10,6 +10,12 @@ function isAscending(midis: number[]): boolean {
   return true
 }
 
+/** Two adjacent voices a bare semitone apart — reads as a fingering mistake on piano. */
+function hasSemitoneCluster(midis: number[]): boolean {
+  for (let i = 1; i < midis.length; i++) if (midis[i] - midis[i - 1] === 1) return true
+  return false
+}
+
 describe('nextVoicing — cross-chord invariants over every real chart', () => {
   for (const p of PROGRESSIONS) {
     const timeline = buildTimeline(p, p.defaultKey)
@@ -32,11 +38,8 @@ describe('nextVoicing — cross-chord invariants over every real chart', () => {
 })
 
 describe('nextVoicing — every quality in the chord library, fresh seat', () => {
-  // Root fixed at C (pc 0), which always has two octave slots in
-  // [48,69] — sidesteps the one pathological edge (a bare power chord
-  // whose root lands on pc 10/11, which has only one slot in-register and
-  // can't be doubled to reach the 3-note minimum; not exercised by any
-  // real chart, see task-6-report.md).
+  // All 12 roots are additionally swept by the cluster suite below; this
+  // block pins the structural invariants per quality at a fixed root.
   for (const q of QUALITIES) {
     it(`${q.id}: voices 3-5 ascending notes within register from a fresh seat`, () => {
       const c: Chord = { root: PC.C, quality: q }
@@ -52,11 +55,103 @@ describe('nextVoicing — every quality in the chord library, fresh seat', () =>
   }
 })
 
+describe('nextVoicing — no adjacent-semitone clusters, ever', () => {
+  // The cluster-free candidate pool depends only on (quality, root, register)
+  // — prev influences the cost ranking, never the pool — so a fresh-seat
+  // sweep over all 27 qualities x 12 roots is a COMPLETE proof that the
+  // clustered fallback is unreachable, and the chained sweeps then verify
+  // the cost function keeps picking from that pool under voice-leading
+  // pressure.
+  it('fresh seat: all 27 qualities x 12 roots', () => {
+    for (const q of QUALITIES) {
+      for (let root = 0; root < 12; root++) {
+        const v = nextVoicing({ root: normalizePc(root), quality: q }, null)
+        expect(hasSemitoneCluster(v), `${q.id} root ${root}: ${v.join(',')}`).toBe(false)
+      }
+    }
+  })
+
+  it('voice-led chains: all 27 qualities x 12 roots (cycle of 4ths), led from a drifting prev', () => {
+    for (let start = 0; start < 12; start++) {
+      let prev: number[] | null = null
+      for (let step = 0; step < 12; step++) {
+        for (const q of QUALITIES) {
+          const root = normalizePc(start + step * 5)
+          const v = nextVoicing({ root, quality: q }, prev)
+          expect(hasSemitoneCluster(v), `${q.id} root ${root}: ${v.join(',')}`).toBe(false)
+          prev = v
+        }
+      }
+    }
+  })
+
+  it('every chord of every PROGRESSION in keys C, A, and E — fresh-seat and chained', () => {
+    for (const p of PROGRESSIONS) {
+      for (const key of [PC.C, PC.A, PC.E]) {
+        const timeline = buildTimeline(p, key)
+        let prev: number[] | null = null
+        for (const ev of timeline) {
+          const fresh = nextVoicing(ev.chord, null)
+          expect(hasSemitoneCluster(fresh), `${p.id}/key${key} ${ev.symbol} fresh: ${fresh.join(',')}`).toBe(false)
+          const led = nextVoicing(ev.chord, prev)
+          expect(hasSemitoneCluster(led), `${p.id}/key${key} ${ev.symbol} led: ${led.join(',')}`).toBe(false)
+          prev = led
+        }
+      }
+    }
+  })
+
+  it("the reviewer's exact repro charts are cluster-free when chained", () => {
+    // Reported: blues-minor in A gave Dm7 => 48,64,65; neo-soul-vamp in C
+    // gave G7#9 => 53,58,59.
+    for (const [id, key] of [['blues-minor', PC.A], ['neo-soul-vamp', PC.C]] as const) {
+      let prev: number[] | null = null
+      for (const ev of buildTimeline(progressionById(id), key)) {
+        prev = nextVoicing(ev.chord, prev)
+        expect(hasSemitoneCluster(prev), `${id} ${ev.symbol}: ${prev.join(',')}`).toBe(false)
+      }
+    }
+  })
+
+  it('7#9: the #9 is never adjacent to the major third (the Hendrix spread)', () => {
+    const q = QUALITIES.find((qq) => qq.id === '7#9')!
+    const slotsInRegister = (pc: number): number => {
+      let count = 0
+      for (let m = KEYS_REGISTER[0]; m <= KEYS_REGISTER[1]; m++) if (normalizePc(m) === pc) count++
+      return count
+    }
+    for (let root = 0; root < 12; root++) {
+      const v = nextVoicing({ root: normalizePc(root), quality: q }, null)
+      const thirdPc = normalizePc(root + 4)
+      const sharp9Pc = normalizePc(root + 3)
+      const third = v.find((m) => normalizePc(m) === thirdPc)
+      const sharp9 = v.find((m) => normalizePc(m) === sharp9Pc)
+      expect(third, `third missing for root ${root}`).toBeDefined()
+      // The #9 can only spread away from the third when at least one of the
+      // two pcs has a second octave slot in the register; when both are
+      // single-slot (they sit a semitone apart — G7#9's B=59/Bb=58 is the
+      // only such root in [48,69]) the color is dropped, never crushed.
+      const canCoexist = slotsInRegister(thirdPc) >= 2 || slotsInRegister(sharp9Pc) >= 2
+      if (canCoexist) {
+        expect(sharp9, `#9 missing for root ${root}`).toBeDefined()
+        expect(Math.abs(sharp9! - third!)).toBeGreaterThan(1)
+      } else {
+        expect(sharp9, `#9 should be dropped, not crushed, for root ${root}`).toBeUndefined()
+      }
+    }
+  })
+})
+
 describe('nextVoicing — shell test', () => {
   it('7th-quality chords contain the third pc and the seventh pc', () => {
     for (const q of QUALITIES) {
       const hasThird = q.intervals.includes(3) || q.intervals.includes(4)
-      const seventh = q.intervals.includes(11) ? 11 : q.intervals.includes(10) ? 10 : null
+      // dim7's seventh is the bb7 (interval 9); for every other quality a
+      // bare 9 is a 6th/13th, so gate the bb7 reading on the quality id.
+      const seventh = q.intervals.includes(11) ? 11
+        : q.intervals.includes(10) ? 10
+        : q.id === 'dim7' ? 9
+        : null
       if (!hasThird || seventh === null) continue
       const third = q.intervals.includes(4) ? 4 : 3
       const c: Chord = { root: PC.D, quality: q }
