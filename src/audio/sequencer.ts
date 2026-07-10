@@ -4,6 +4,7 @@ import {
   type Chord, type PitchClass, type Progression, type TimelineEvent,
 } from '../music-core'
 import { getBand } from './instruments'
+import { audioNow } from './context'
 
 /**
  * SequencerEngine: one Tone.Transport wrapper that turns a Progression into
@@ -209,9 +210,9 @@ export class SequencerEngine {
     const HAT_VEL = [0.85, 0.35, 0.6, 0.35, 0.75, 0.35, 0.6, 0.4]
     this.parts.push(new Tone.Sequence(
       (time, inBar: number) => {
-        if (inBar === 0 || inBar === 4) band.kick.trigger(time + human() * 0.5, inBar === 0 ? 1 : 0.85)
-        if (inBar === 2 || inBar === 6) band.snare.trigger(time + human() * 0.5, 0.9)
-        band.hat.trigger(time + human() * 0.5, HAT_VEL[inBar])
+        if (inBar === 0 || inBar === 4) band.drums.trigger('kick', time + human() * 0.5, inBar === 0 ? 1 : 0.85)
+        if (inBar === 2 || inBar === 6) band.drums.trigger('snare', time + human() * 0.5, 0.9)
+        band.drums.trigger('hat-closed', time + human() * 0.5, HAT_VEL[inBar])
         if (inBar % 2 === 0) {
           Tone.getDraw().schedule(() => {
             const [bar, beat] = String(Tone.getTransport().position).split(':').map(Number)
@@ -224,7 +225,19 @@ export class SequencerEngine {
     ).start(0))
   }
 
-  play(): void { Tone.getTransport().start() }
+  play(opts?: { countIn?: boolean }): void {
+    const t = Tone.getTransport()
+    if (opts?.countIn && this.progression && t.seconds === 0) {
+      const beat = 60 / t.bpm.value
+      const beats = this.progression.timeSignature[0]
+      const start = audioNow() + 0.08
+      for (let i = 0; i < beats; i++)
+        getBand().drums.trigger('xstick', start + i * beat, i === 0 ? 1 : 0.7)
+      t.start(start + beats * beat)
+      return
+    }
+    t.start()
+  }
   pause(): void { Tone.getTransport().pause() }
 
   stop(): void {
@@ -259,6 +272,11 @@ export class SequencerEngine {
     this.stop()
     for (const p of this.parts) p.dispose()
     this.parts = []
+    const t = Tone.getTransport()
+    t.swing = 0
+    t.swingSubdivision = '8n'
+    t.timeSignature = 4
+    t.loop = false
   }
 }
 

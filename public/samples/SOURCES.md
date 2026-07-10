@@ -50,13 +50,15 @@ offline afterward. Nothing under `public/samples/` is fetched at runtime.
 - **What was taken**: guitar 12-note and bass 9-note sample sets used by
   `Tone.Sampler` in `src/audio/samples.ts`.
 
-## Drums (`drums/`) — legacy, single-sample-per-hit
+## Drums (`drums/`) — legacy, single-sample-per-hit (removed)
 
 - **Source**: Tone.js "Kit8" drum sample set, via
   [tonejs.github.io](https://tonejs.github.io/audio/).
 - **License**: bundled with Tone.js's example audio assets.
 - **What was taken**: one file per drum (`kick.mp3`, `snare.mp3`,
   `hihat.mp3`, `tom1.mp3`) — a single velocity layer, no round robins.
-- **Status**: to be removed in a later task once the Salamander-kit-backed
-  `DrumVoice` engine (consuming `kits/salamander/kit.json`) replaces the
-  `DrumHit` player path in `src/audio/samples.ts`.
+- **Status**: removed (Task 4 of the audio overhaul) now that the
+  Salamander-kit-backed `DrumVoice` engine (`kits/salamander/`, see above)
+  replaced the `DrumHit` player path that used to live in
+  `src/audio/samples.ts`. The files themselves are gone from `public/`; this
+  entry stays for provenance.

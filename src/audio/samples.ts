@@ -3,7 +3,8 @@ import * as Tone from 'tone'
 /**
  * Sampled instruments, served from public/samples (downloaded once, offline
  * after that). Sampler keys use note names ("D#4"); files use "Ds4.mp3".
- * Piano: Salamander. Guitar/bass: tonejs-instruments (CC). Drums: Tone.js Kit8.
+ * Piano: Salamander. Guitar/bass: tonejs-instruments (CC). Drums: see
+ * src/audio/drum-voice.ts (multisampled Salamander kit).
  */
 
 function urls(names: string[]): Record<string, string> {
@@ -26,26 +27,6 @@ export function createGuitar(): Tone.Sampler {
 
 export function createBass(): Tone.Sampler {
   return new Tone.Sampler({ urls: urls(BASS_NOTES), baseUrl: '/samples/bass/', release: 0.4 })
-}
-
-/** One drum hit: a Player behind its own gain so velocity is schedulable. */
-export class DrumHit {
-  readonly out: Tone.Gain
-  private player: Tone.Player
-
-  constructor(file: string) {
-    this.out = new Tone.Gain(1)
-    this.player = new Tone.Player({ url: `/samples/drums/${file}` }).connect(this.out)
-  }
-
-  trigger(time: number, velocity = 1): void {
-    try {
-      this.out.gain.setValueAtTime(velocity, time)
-      this.player.start(time)
-    } catch {
-      // a rare out-of-order restart during transport handoff — drop the hit
-    }
-  }
 }
 
 /** Resolves when every sample buffer is decoded. */
