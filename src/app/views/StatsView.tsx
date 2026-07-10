@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DEGREE_LABELS, PC, pcName, type PitchClass } from '../../music-core'
 import { allCells, attemptCount } from '../../state/db'
 import type { DrillType, SkillCell } from '../../state/skill-model'
+import { applyBackup, exportBackup, validateBackup } from '../../state/backup'
+import { showToast } from '../../state/toasts'
 import './stats.css'
 
 /**
@@ -21,6 +23,7 @@ export function StatsView() {
   const [cells, setCells] = useState<SkillCell[]>([])
   const [total, setTotal] = useState(0)
   const [drill, setDrill] = useState<DrillType>('find')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void allCells().then(setCells)
@@ -28,6 +31,39 @@ export function StatsView() {
   }, [])
 
   const byKey = new Map(cells.filter((c) => c.drill === drill).map((c) => [`${c.degree}:${c.key}`, c]))
+
+  async function handleExport() {
+    try {
+      await exportBackup()
+      showToast({ message: 'Backup exported.' })
+    } catch {
+      showToast({ message: "Couldn't export the backup." })
+    }
+  }
+
+  async function handleImportFile(file: File) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      showToast({ message: 'That file is not valid JSON.' })
+      return
+    }
+    if (!validateBackup(parsed)) {
+      showToast({ message: "That doesn't look like a Calliope backup file." })
+      return
+    }
+    const ok = window.confirm(
+      `Replace all practice data with this backup (${parsed.attempts.length} attempts)? This cannot be undone.`,
+    )
+    if (!ok) return
+    try {
+      await applyBackup(parsed)
+      // applyBackup reloads the page on success — nothing left to do here.
+    } catch {
+      showToast({ message: "Couldn't restore the backup." })
+    }
+  }
 
   return (
     <div className="panel">
@@ -41,6 +77,24 @@ export function StatsView() {
           ))}
         </div>
         <span className="mono dim" style={{ marginLeft: 'auto' }}>{total} attempts logged</span>
+      </div>
+
+      <div className="controls">
+        <span className="control-label">Backup</span>
+        <button onClick={() => void handleExport()}>export backup</button>
+        <button onClick={() => fileInputRef.current?.click()}>import backup</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = '' // allow re-selecting the same file next time
+            if (file) void handleImportFile(file)
+          }}
+        />
+        <span className="mono dim" style={{ marginLeft: 'auto' }}>{total} attempts to back up</span>
       </div>
 
       <div className="heat">

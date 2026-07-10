@@ -46,10 +46,19 @@ export function getBand(): Band {
   }
 
   kitPromise = loadKit('salamander')
-  kitPromise.then((loaded) => {
-    kit = loaded
-    for (const [, voice] of loaded.voices()) mixer.connectDrumVoice(voice)
-  })
+  kitPromise
+    .then((loaded) => {
+      kit = loaded
+      for (const [, voice] of loaded.voices()) mixer.connectDrumVoice(voice)
+    })
+    .catch(() => {
+      // Kit load failed (aborted/missing kit.json, bad buffers, ...).
+      // Drop the cached band so a retry (the start-gate's "retry" toast
+      // action re-invokes the whole load sequence) actually re-attempts
+      // loadKit instead of replaying this same settled rejection forever.
+      band = null
+      kitPromise = null
+    })
 
   band = {
     keys,

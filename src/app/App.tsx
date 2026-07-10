@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { startAudio } from '../audio/context'
+import { onLoadError } from '../audio/load-errors'
 import { ExploreView } from './views/ExploreView'
 import { SingView } from './views/SingView'
 import { SongLabView } from './views/SongLabView'
@@ -13,6 +14,7 @@ import { MicToggle } from './components/MicToggle'
 import { ToastHost } from './components/Toast'
 import { setMicDisabled } from '../pitch/pitch-engine'
 import { useAppPrefs } from '../state/app-prefs'
+import { showToast } from '../state/toasts'
 import './tokens.css'
 import './app.css'
 
@@ -66,6 +68,43 @@ export default function App() {
     }
   }, [])
 
+  // audio/ can't import state/ (layering rule — see CLAUDE.md), so sample
+  // load failures are reported through the dependency-free load-errors
+  // registry and turned into toasts here, at the app layer.
+  useEffect(() => {
+    return onLoadError((what) => {
+      showToast({
+        message: `Couldn't load the ${what} samples — the band may be missing a member. Check the dev server / files.`,
+      })
+    })
+  }, [])
+
+  async function loadEverything() {
+    await startAudio()
+    // decode every sample before the first note can be asked for
+    const [{ warmAudition }, { getBand, bandReady }, { samplesLoaded }] = await Promise.all([
+      import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
+    ])
+    warmAudition()
+    getBand()
+    await Promise.all([samplesLoaded(), bandReady()])
+  }
+
+  async function handleStartGate() {
+    setLoading(true)
+    try {
+      await loadEverything()
+      setReady(true)
+    } catch {
+      showToast({
+        message: "Couldn't load the band — check the dev server / sample files.",
+        action: { label: 'retry', run: () => void handleStartGate() },
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
       {!ready ? (
@@ -75,22 +114,7 @@ export default function App() {
             Music theory built on the map you already own — the pentatonic shapes,
             the E and A anchors, and your ear.
           </p>
-          <button
-            className="primary"
-            disabled={loading}
-            onClick={async () => {
-              setLoading(true)
-              await startAudio()
-              // decode every sample before the first note can be asked for
-              const [{ warmAudition }, { getBand, bandReady }, { samplesLoaded }] = await Promise.all([
-                import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
-              ])
-              warmAudition()
-              getBand()
-              await Promise.all([samplesLoaded(), bandReady()])
-              setReady(true)
-            }}
-          >
+          <button className="primary" disabled={loading} onClick={() => void handleStartGate()}>
             {loading ? 'tuning up…' : 'Pick up the guitar'}
           </button>
         </div>

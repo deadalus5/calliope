@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import { pickLayer, pickRR, type LayerSpec } from './drum-math'
+import { reportLoadError } from './load-errors'
 
 /**
  * Multisampled drum playback: velocity layers + round robins + hi-hat choke
@@ -123,13 +124,20 @@ export class DrumKit {
   }
 
   static async load(id: string): Promise<DrumKit> {
-    const baseUrl = `/samples/kits/${id}`
-    const res = await fetch(`${baseUrl}/kit.json`)
-    if (!res.ok) throw new Error(`kit manifest fetch failed: ${res.status} ${res.statusText}`)
-    const manifest: KitManifest = await res.json()
-    const kit = new DrumKit(manifest, baseUrl)
-    await kit.ready
-    return kit
+    try {
+      const baseUrl = `/samples/kits/${id}`
+      const res = await fetch(`${baseUrl}/kit.json`)
+      if (!res.ok) throw new Error(`kit manifest fetch failed: ${res.status} ${res.statusText}`)
+      const manifest: KitManifest = await res.json()
+      const kit = new DrumKit(manifest, baseUrl)
+      await kit.ready
+      return kit
+    } catch (err) {
+      // kit.json fetch/parse failure or a buffer decode failure — surface it
+      // (bandReady must still reject so the start-gate knows to hold).
+      reportLoadError('drums')
+      throw err
+    }
   }
 
   trigger(articulation: string, time: number, vel = 1): void {
