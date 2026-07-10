@@ -10,6 +10,7 @@ import { reportMicFailure } from '../mic-errors'
 import { recordAttempt } from '../../state/db'
 import { useAppPrefs } from '../../state/app-prefs'
 import { degreeOf, normalizePc, type PitchClass } from '../../music-core'
+import { pickTargetInterval } from './guide-tone-target'
 
 /**
  * Guide-tone drill for Song Lab: while the band plays, pearl the upcoming
@@ -34,28 +35,6 @@ export interface GuideToneState {
   lastResult: 'hit' | 'miss' | null
   tally: { hits: number; total: number }
   toggle(): void
-}
-
-const THIRDS = new Set([3, 4])
-const SEVENTHS = new Set([10, 11])
-const SUS = new Set([2, 5])
-
-interface PickedTarget { interval: number; label: string }
-
-/** Alternates 3rd/7th focus per chord change; falls back gracefully when the
- *  upcoming chord doesn't have the preferred tone (no 7th -> 3rd; a sus
- *  chord with neither triad third -> its sus tone). */
-function pickTargetInterval(intervals: number[], preferSeventh: boolean): PickedTarget | null {
-  const third = intervals.find((i) => THIRDS.has(i))
-  const seventh = intervals.find((i) => SEVENTHS.has(i))
-  const sus = intervals.find((i) => SUS.has(i))
-  const order = preferSeventh ? [seventh, third, sus] : [third, sus, seventh]
-  for (const interval of order) {
-    if (interval === undefined) continue
-    const label = SEVENTHS.has(interval) ? '7th' : THIRDS.has(interval) ? '3rd' : interval === 2 ? 'sus2' : 'sus4'
-    return { interval, label }
-  }
-  return null
 }
 
 interface LiveWindow {
@@ -99,11 +78,23 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     openTimerRef.current = null
   }, [])
 
-  /** Tear down whatever window is currently open (duck + listener), logging
-   *  a miss if nothing matched yet and the song hasn't changed underneath
-   *  it. Always unducks — if we ramped the bus down, we must ramp it back
-   *  regardless of whether the attempt is still meaningful to log. */
-  const closeLiveWindow = useCallback(() => {
+  /** Tear down whatever window is currently open (duck + listener). Always
+   *  unducks — if we ramped the bus down, we must ramp it back regardless
+   *  of why we're closing.
+   *
+   *  `score`: only the window's own closeTimer firing naturally passes
+   *  true — that is the sole path allowed to log a miss. Every abort path
+   *  (toggle-off, unmount, mic-mode flip, superseded window) passes false:
+   *  an aborted window is not evidence he missed the note, and logging it
+   *  would poison the EWMA with phantom misses (the fabricated-attempt
+   *  failure mode Task 11 hit). Even a natural close only scores if the
+   *  transport is STILL playing and the song hasn't changed — windows run
+   *  on the wall clock via setTimeout, decoupled from Tone.Transport, so a
+   *  Song Lab pause/stop mid-window would otherwise let the close fire
+   *  against a silent band (or, after pause-then-resume, out of sync with
+   *  the delayed chord change) and log a miss he never had a chance to
+   *  answer. A paused-through window is simply abandoned, unscored. */
+  const closeLiveWindow = useCallback((score: boolean) => {
     const win = liveWindowRef.current
     if (!win) return
     clearTimeout(win.closeTimer)
@@ -111,7 +102,7 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     liveWindowRef.current = null
     unduckBacking(audioNow())
     exposeDebug({ guideTone: { targetPc: win.targetPc, windowOpen: false } })
-    if (!win.matched && win.progId === sequencer.progression?.id) {
+    if (score && !win.matched && sequencer.playing && win.progId === sequencer.progression?.id) {
       void recordAttempt({
         ts: Date.now(), drill: 'chordtone', degree: degreeOf(win.targetPc, keyRef.current), key: keyRef.current,
         correct: false, latencyMs: 0, detail: 'guide',
@@ -130,8 +121,8 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     if (!sequencer.playing || sequencer.progression?.id !== progId) return
     // Defensive only: given the >=1-bar chord-duration invariant this
     // shouldn't happen, but never leave two windows' duck/listener state
-    // stacked if it does.
-    if (liveWindowRef.current) closeLiveWindow()
+    // stacked if it does. Superseded window = aborted, not scored.
+    if (liveWindowRef.current) closeLiveWindow(false)
 
     const lockUnsub = noteTracker.on((e) => {
       if (e.type !== 'lock') return
@@ -146,7 +137,9 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
       setLastResult('hit')
       setTally((t) => ({ hits: t.hits + 1, total: t.total + 1 }))
     })
-    const closeTimer = setTimeout(() => closeLiveWindow(), Math.max(0, (windowCloseAt - audioNow()) * 1000))
+    // The natural close is the ONLY scoring close (score: true) — and even
+    // it re-checks playing/progId inside closeLiveWindow at fire time.
+    const closeTimer = setTimeout(() => closeLiveWindow(true), Math.max(0, (windowCloseAt - audioNow()) * 1000))
     liveWindowRef.current = { targetPc, tNext, matched: false, progId, closeTimer, lockUnsub }
     duckBacking(audioNow())
     exposeDebug({ guideTone: { targetPc, windowOpen: true } })
@@ -186,7 +179,9 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     chordUnsubRef.current?.()
     chordUnsubRef.current = null
     clearOpenSchedule()
-    if (liveWindowRef.current) closeLiveWindow()
+    // Teardown never scores: the session ending mid-window must not log a
+    // phantom miss (it still unducks and releases the lock listener).
+    if (liveWindowRef.current) closeLiveWindow(false)
     noteTracker.stop()
     stopPitchEngine()
     activeRef.current = false
