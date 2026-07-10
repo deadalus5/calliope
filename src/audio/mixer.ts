@@ -12,6 +12,9 @@ import type { DrumVoice } from './drum-voice'
 
 export type MixChannelId = 'keys' | 'bass' | 'drums'
 
+/** Base channel volumes (dB) each style's `trims` are added on top of. */
+export const BASE_CHANNEL_DB: Record<MixChannelId, number> = { keys: -7, bass: -4, drums: 0 }
+
 export interface Mixer {
   channel(id: MixChannelId): Tone.Channel
   /** Wire a DrumVoice.out through pan + reverb send into the drum bus. */
@@ -22,6 +25,8 @@ export interface Mixer {
   ready: Promise<void>
   /** Current master peak in dBFS (Tone.Meter after the limiter). */
   peakDb(): number
+  /** Set each channel's volume to its BASE_CHANNEL_DB + (trims[id] ?? 0). */
+  applyTrims(trims?: Partial<Record<MixChannelId, number>>): void
 }
 
 let mixer: Mixer | null = null
@@ -80,12 +85,19 @@ export function getMixer(): Mixer {
     return Array.isArray(value) ? Math.max(...value) : value
   }
 
+  function applyTrims(trims?: Partial<Record<MixChannelId, number>>): void {
+    for (const id of Object.keys(channels) as MixChannelId[]) {
+      channels[id].volume.value = BASE_CHANNEL_DB[id] + (trims?.[id] ?? 0)
+    }
+  }
+
   mixer = {
     channel: (id) => channels[id],
     connectDrumVoice,
     duck,
     ready: reverb.ready,
     peakDb,
+    applyTrims,
   }
 
   // Expose for E2E (Task 9 extends this).
