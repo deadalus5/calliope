@@ -1,17 +1,18 @@
 import * as Tone from 'tone'
+import { DrumHit, createBass, createPiano } from '../samples'
 
 /**
- * The backing band: Rhodes-ish keys, round bass, brushy kit — all routed
+ * The backing band, sampled: real piano, real bass, real kit — all routed
  * through one backing bus whose gain the drill engine ducks during answer
  * windows (the band "drops out for your fill").
  */
 
 export interface Band {
-  keys: Tone.PolySynth
-  bass: Tone.MonoSynth
-  kick: Tone.MembraneSynth
-  snare: Tone.NoiseSynth
-  hat: Tone.NoiseSynth
+  keys: Tone.Sampler
+  bass: Tone.Sampler
+  kick: DrumHit
+  snare: DrumHit
+  hat: DrumHit
   bus: Tone.Gain
 }
 
@@ -21,43 +22,15 @@ export function getBand(): Band {
   if (band) return band
   const bus = new Tone.Gain(1).toDestination()
 
-  const keys = new Tone.PolySynth(Tone.FMSynth, {
-    harmonicity: 2,
-    modulationIndex: 1.4,
-    oscillator: { type: 'sine' },
-    modulation: { type: 'sine' },
-    envelope: { attack: 0.01, decay: 1.4, sustain: 0.4, release: 1.1 },
-    modulationEnvelope: { attack: 0.01, decay: 0.7, sustain: 0.2, release: 0.8 },
-    volume: -16,
-  }).connect(bus)
+  const keys = createPiano().connect(new Tone.Volume(-9).connect(bus))
+  const bass = createBass().connect(new Tone.Volume(-4).connect(bus))
 
-  const bass = new Tone.MonoSynth({
-    oscillator: { type: 'triangle' },
-    filter: { type: 'lowpass', Q: 1.2 },
-    envelope: { attack: 0.008, decay: 0.3, sustain: 0.55, release: 0.4 },
-    filterEnvelope: { attack: 0.005, decay: 0.25, sustain: 0.35, release: 0.4, baseFrequency: 90, octaves: 2.2 },
-    volume: -10,
-  }).connect(bus)
-
-  const kick = new Tone.MembraneSynth({
-    pitchDecay: 0.04, octaves: 7,
-    envelope: { attack: 0.001, decay: 0.35, sustain: 0.01, release: 0.6 },
-    volume: -10,
-  }).connect(bus)
-
-  const snareFilter = new Tone.Filter(2400, 'bandpass').connect(bus)
-  const snare = new Tone.NoiseSynth({
-    noise: { type: 'pink' },
-    envelope: { attack: 0.001, decay: 0.18, sustain: 0 },
-    volume: -16,
-  }).connect(snareFilter)
-
-  const hatFilter = new Tone.Filter(9000, 'highpass').connect(bus)
-  const hat = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.045, sustain: 0 },
-    volume: -22,
-  }).connect(hatFilter)
+  const kick = new DrumHit('kick.mp3')
+  kick.out.connect(new Tone.Volume(-6).connect(bus))
+  const snare = new DrumHit('snare.mp3')
+  snare.out.connect(new Tone.Volume(-10).connect(bus))
+  const hat = new DrumHit('hihat.mp3')
+  hat.out.connect(new Tone.Volume(-14).connect(bus))
 
   band = { keys, bass, kick, snare, hat, bus }
   return band

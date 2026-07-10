@@ -37,6 +37,7 @@ const SpotifyView = lazy(() =>
 
 export default function App() {
   const [ready, setReady] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [module, setModule] = useState<ModuleId>('explore')
 
   // Returning from Spotify OAuth lands on /callback: finish the token
@@ -60,12 +61,21 @@ export default function App() {
         </p>
         <button
           className="primary"
+          disabled={loading}
           onClick={async () => {
+            setLoading(true)
             await startAudio()
+            // decode every sample before the first note can be asked for
+            const [{ warmAudition }, { getBand }, { samplesLoaded }] = await Promise.all([
+              import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
+            ])
+            warmAudition()
+            getBand()
+            await samplesLoaded()
             setReady(true)
           }}
         >
-          Pick up the guitar
+          {loading ? 'tuning up…' : 'Pick up the guitar'}
         </button>
       </div>
     )
