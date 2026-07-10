@@ -6,7 +6,7 @@
 //
 // Bump this on any change to the cached shell/strategy — old caches are
 // deleted in `activate`.
-const CACHE_VERSION = 'calliope-v1'
+const CACHE_VERSION = 'calliope-v2'
 const SHELL_CACHE = `${CACHE_VERSION}-shell`
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
 
@@ -22,8 +22,19 @@ const SHELL_URLS = [
 ]
 
 self.addEventListener('install', (event) => {
+  // Per-item add (not addAll): addAll is all-or-nothing, so a single
+  // missing shell file would silently brick the whole install. A failed
+  // item just degrades — it gets runtime-cached on first successful fetch.
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_URLS)),
+    caches.open(SHELL_CACHE).then((cache) =>
+      Promise.all(
+        SHELL_URLS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.debug('[sw] precache skipped', url, err)
+          }),
+        ),
+      ),
+    ),
   )
   self.skipWaiting()
 })
@@ -88,10 +99,15 @@ self.addEventListener('fetch', (event) => {
         return res
       })
       .catch(() =>
-        caches.match(request).then((cached) => {
+        caches.match(request).then(async (cached) => {
           if (cached) return cached
-          if (request.mode === 'navigate') return caches.match('/index.html')
-          return undefined
+          if (request.mode === 'navigate') {
+            const shell = await caches.match('/index.html')
+            if (shell) return shell
+          }
+          // Never resolve respondWith with undefined — hand back a real
+          // (failed) Response so the request pipeline stays well-formed.
+          return new Response('', { status: 504, statusText: 'offline' })
         }),
       ),
   )

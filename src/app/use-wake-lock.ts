@@ -14,9 +14,15 @@ export function useWakeLock(active: boolean): void {
   useEffect(() => {
     if (!('wakeLock' in navigator)) return
     let cancelled = false
+    let requesting = false
 
     async function acquire() {
       if (!active || document.visibilityState !== 'visible') return
+      // Guard double-acquire: a second request while one is in flight (or
+      // while we already hold a live sentinel) would overwrite the ref and
+      // orphan the first lock, never to be released.
+      if (requesting || sentinelRef.current) return
+      requesting = true
       try {
         const sentinel = await navigator.wakeLock.request('screen')
         if (cancelled) {
@@ -24,10 +30,18 @@ export function useWakeLock(active: boolean): void {
           void sentinel.release()
           return
         }
+        // The OS auto-releases the lock when the tab hides; clear the ref
+        // then, so the visibilitychange re-acquire isn't blocked by a dead
+        // sentinel.
+        sentinel.addEventListener('release', () => {
+          if (sentinelRef.current === sentinel) sentinelRef.current = null
+        })
         sentinelRef.current = sentinel
       } catch (err) {
         // Denial is routine (battery saver, unsupported context) — not an error.
         console.debug('[wake-lock] request failed', err)
+      } finally {
+        requesting = false
       }
     }
 
