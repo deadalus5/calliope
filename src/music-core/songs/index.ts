@@ -1,0 +1,222 @@
+import { PC } from '../note'
+import type { Progression } from '../progression'
+
+/**
+ * Backing-track material. Blues forms are canonical; the song-styled charts
+ * are simplified "in the style of" changes for jamming and teaching — edit
+ * freely, they are just data.
+ */
+
+export const PROGRESSIONS: Progression[] = [
+  {
+    id: 'blues-12-standard',
+    name: '12-Bar Blues (standard)',
+    defaultKey: PC.A,
+    defaultTempo: 92,
+    timeSignature: [4, 4],
+    feel: 'shuffle',
+    scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
+    description: 'The home form. Minor pentatonic over dominant chords is the blues sound itself.',
+    steps: [
+      { symbol: 'A7', beats: 16 },
+      { symbol: 'D7', beats: 8 }, { symbol: 'A7', beats: 8 },
+      { symbol: 'E7', beats: 4 }, { symbol: 'D7', beats: 4 },
+      { symbol: 'A7', beats: 4 }, { symbol: 'E7', beats: 4 },
+    ],
+  },
+  {
+    id: 'blues-12-quick',
+    name: '12-Bar Blues (quick change)',
+    defaultKey: PC.A,
+    defaultTempo: 100,
+    timeSignature: [4, 4],
+    feel: 'shuffle',
+    scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
+    description: 'Same form, IV chord in bar 2 — hear the early lift.',
+    steps: [
+      { symbol: 'A7', beats: 4 }, { symbol: 'D7', beats: 4 }, { symbol: 'A7', beats: 8 },
+      { symbol: 'D7', beats: 8 }, { symbol: 'A7', beats: 8 },
+      { symbol: 'E7', beats: 4 }, { symbol: 'D7', beats: 4 },
+      { symbol: 'A7', beats: 4 }, { symbol: 'E7', beats: 4 },
+    ],
+  },
+  {
+    id: 'blues-minor',
+    name: 'Minor Blues',
+    defaultKey: PC.A,
+    defaultTempo: 80,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'aeolian', rootOffset: 0 },
+    description: 'The Thrill Is Gone territory. Watch the b6 color on the bVI chord.',
+    steps: [
+      { symbol: 'Am7', beats: 16 },
+      { symbol: 'Dm7', beats: 8 }, { symbol: 'Am7', beats: 8 },
+      { symbol: 'Fmaj7', beats: 4 }, { symbol: 'E7', beats: 4 },
+      { symbol: 'Am7', beats: 8 },
+    ],
+  },
+  {
+    id: 'franklins',
+    name: "Franklin's Tower (style of)",
+    artistHint: 'Grateful Dead',
+    defaultKey: PC.A,
+    defaultTempo: 118,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
+    description: 'THE Mixolydian teacher: A–G–D. The G chord IS the b7 color note as a whole chord.',
+    steps: [
+      { symbol: 'A', beats: 8 }, { symbol: 'G', beats: 4 }, { symbol: 'D', beats: 4 },
+      { symbol: 'A', beats: 8 }, { symbol: 'G', beats: 4 }, { symbol: 'D', beats: 4 },
+    ],
+  },
+  {
+    id: 'fire-mountain',
+    name: 'Fire on the Mountain (style of)',
+    artistHint: 'Grateful Dead',
+    defaultKey: PC.B,
+    defaultTempo: 104,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
+    description: 'Two chords, one mode: B to A forever. Pure I–bVII Mixolydian vamp.',
+    steps: [
+      { symbol: 'B', beats: 8 }, { symbol: 'A', beats: 8 },
+    ],
+  },
+  {
+    id: 'scarlet',
+    name: 'Scarlet Begonias (style of)',
+    artistHint: 'Grateful Dead',
+    defaultKey: PC.B,
+    defaultTempo: 110,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
+    description: 'B–A–E: Mixolydian with the IV giving it that skipping major bounce.',
+    steps: [
+      { symbol: 'B', beats: 8 }, { symbol: 'A', beats: 4 }, { symbol: 'E', beats: 4 },
+      { symbol: 'B', beats: 8 }, { symbol: 'A', beats: 4 }, { symbol: 'E', beats: 4 },
+    ],
+  },
+  {
+    id: 'sugaree',
+    name: 'Sugaree (style of)',
+    artistHint: 'Grateful Dead',
+    defaultKey: PC.B,
+    defaultTempo: 96,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'ionian', rootOffset: 0 },
+    description: 'A lazy I–IV vamp — major pentatonic home, Ionian colors on top.',
+    steps: [
+      { symbol: 'B', beats: 8 }, { symbol: 'E', beats: 8 },
+    ],
+  },
+  {
+    id: 'slow-dancing',
+    name: 'Slow Dancing in a Burning Room (style of)',
+    artistHint: 'John Mayer',
+    defaultKey: PC.Cs, // relative center C#m; changes written from C#m
+    defaultTempo: 78,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'aeolian', rootOffset: 0 },
+    description: 'C#m–A–E–B: the slow-burn minor lament. Triad targets on every change.',
+    steps: [
+      { symbol: 'C#m7', beats: 4 }, { symbol: 'A', beats: 4 },
+      { symbol: 'E', beats: 4 }, { symbol: 'B', beats: 4 },
+    ],
+  },
+  {
+    id: 'gravity',
+    name: 'Gravity (style of)',
+    artistHint: 'John Mayer',
+    defaultKey: PC.G,
+    defaultTempo: 62,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'ionian', rootOffset: 0 },
+    description: 'G to C/G — two chords, infinite space. Major pentatonic with Ionian color notes.',
+    steps: [
+      { symbol: 'G', beats: 8 }, { symbol: 'C/G', beats: 8 },
+    ],
+  },
+  {
+    id: 'waiting',
+    name: 'Waiting on the World to Change (style of)',
+    artistHint: 'John Mayer',
+    defaultKey: PC.D,
+    defaultTempo: 86,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'ionian', rootOffset: 0 },
+    description: 'D–Bm–G–D / A–Bm–G–D: classic soul changes; find the shared tones between triads.',
+    steps: [
+      { symbol: 'D', beats: 4 }, { symbol: 'Bm', beats: 4 },
+      { symbol: 'G', beats: 4 }, { symbol: 'D', beats: 4 },
+      { symbol: 'A', beats: 4 }, { symbol: 'Bm', beats: 4 },
+      { symbol: 'G', beats: 4 }, { symbol: 'D', beats: 4 },
+    ],
+  },
+  {
+    id: 'dorian-vamp',
+    name: 'Dorian Vamp (Oye Como Va style)',
+    defaultKey: PC.A,
+    defaultTempo: 112,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'dorian', rootOffset: 0 },
+    description: 'Am7–D9 forever. The D9 contains the natural 6 (F#) — Dorian as a chord.',
+    steps: [
+      { symbol: 'Am7', beats: 4 }, { symbol: 'D9', beats: 4 },
+    ],
+  },
+  {
+    id: 'neo-soul-vamp',
+    name: 'Neo-Soul Vamp',
+    defaultKey: PC.D,
+    defaultTempo: 72,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'dorian', rootOffset: 0 },
+    description: 'Dm9–G13–Cmaj9–A7#9 style motion — upper-structure triads everywhere.',
+    steps: [
+      { symbol: 'Dm9', beats: 4 }, { symbol: 'G13', beats: 4 },
+      { symbol: 'Cmaj9', beats: 4 }, { symbol: 'A7#9', beats: 4 },
+    ],
+  },
+  {
+    id: 'lydian-vamp',
+    name: 'Lydian Float',
+    defaultKey: PC.C,
+    defaultTempo: 70,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'lydian', rootOffset: 0 },
+    description: 'Cmaj7–D/C: the D triad over C bass IS the #4 color. Slash chord = mode.',
+    steps: [
+      { symbol: 'Cmaj7', beats: 8 }, { symbol: 'D/C', beats: 8 },
+    ],
+  },
+  {
+    id: 'phrygian-vamp',
+    name: 'Phrygian Vamp',
+    defaultKey: PC.E,
+    defaultTempo: 96,
+    timeSignature: [4, 4],
+    feel: 'straight',
+    scaleHint: { modeId: 'phrygian', rootOffset: 0 },
+    description: 'Em–F/E: the F triad a half-step up is the b2 color as a chord.',
+    steps: [
+      { symbol: 'Em', beats: 8 }, { symbol: 'F/E', beats: 8 },
+    ],
+  },
+]
+
+export function progressionById(id: string): Progression {
+  const p = PROGRESSIONS.find((p) => p.id === id)
+  if (!p) throw new Error(`Unknown progression: ${id}`)
+  return p
+}
