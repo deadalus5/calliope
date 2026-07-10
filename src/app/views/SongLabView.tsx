@@ -3,7 +3,7 @@ import { useWakeLock } from '../use-wake-lock'
 import { sequencer, type ChordChangeEvent } from '../../audio/sequencer'
 import { playMidi } from '../../audio/audition'
 import { Fretboard } from '../../fretboard/Fretboard'
-import { chordToneLayer, modeColorLayer, skeletonLayer } from '../../fretboard/build-layers'
+import { chordToneLayer, modeColorLayer, skeletonLayer, targetLayer } from '../../fretboard/build-layers'
 import type { FretboardLayer } from '../../fretboard/layers'
 import {
   PC, PROGRESSIONS, buildTimeline, coordToMidi, degreeOf, modeById, normalizePc, pcName,
@@ -14,6 +14,7 @@ import { degreeColor } from '../../fretboard/palette'
 import { useBoardPrefs } from '../../state/board-prefs'
 import { useAppPrefs } from '../../state/app-prefs'
 import { MixerStrip } from './MixerStrip'
+import { useGuideToneDrill } from './use-guide-tone-drill'
 import './songlab.css'
 
 /** A/B loop selection in form-space bars: `a` set, `b` pending until the second click. */
@@ -42,6 +43,8 @@ export function SongLabView() {
   const countInTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countIn = useAppPrefs((s) => s.countIn)
   const setCountIn = useAppPrefs((s) => s.setCountIn)
+  const micMode = useAppPrefs((s) => s.micMode)
+  const guideTone = useGuideToneDrill(key)
   useWakeLock(playing)
 
   const prog = useMemo(() => progressionById(progId), [progId])
@@ -112,8 +115,15 @@ export function SongLabView() {
     if (focus !== 'chord') out.push(skeletonLayer(scaleRoot, mode.skeleton, 'all'))
     if (focus === 'full') out.push(modeColorLayer(scaleRoot, mode))
     if (current && chordLayers[current.index]) out.push(chordLayers[current.index])
+    // Guide-tone drill: an extra pearl layer on top, all positions of the
+    // upcoming chord's target tone. Zero overhead when the drill is off —
+    // no layer, no mic, no subscriptions (use-guide-tone-drill only
+    // subscribes once toggled on).
+    if (guideTone.active && guideTone.upcoming) {
+      out.push(targetLayer(guideTone.upcoming.targetPc, key, true))
+    }
     return out
-  }, [scaleRoot, mode, focus, current, chordLayers])
+  }, [scaleRoot, mode, focus, current, chordLayers, guideTone.active, guideTone.upcoming, key])
 
   // Toggle play/pause. While a count-in is scheduled (countIn on, clicking
   // play from a dead stop), disable the button for beatsPerBar*60/bpm
@@ -231,6 +241,14 @@ export function SongLabView() {
               </button>
             </div>
           </div>
+          <button
+            className={`songlab-guidetone-toggle${guideTone.active ? ' active' : ''}`}
+            disabled={micMode === 'off'}
+            title={micMode === 'off' ? 'needs the mic — no-mic mode is on' : undefined}
+            onClick={guideTone.toggle}
+          >
+            guide tones
+          </button>
         </div>
 
         <MixerStrip />
@@ -254,8 +272,30 @@ export function SongLabView() {
           </span>
         </div>
 
+        {guideTone.active && <GuideToneHud state={guideTone} keyRoot={key} />}
+
         <Fretboard layers={layers} keyRoot={key} onNoteClick={(c) => playMidi(coordToMidi(c))} />
       </div>
+    </div>
+  )
+}
+
+/** Guide-tone drill HUD: upcoming target, last-result flash, running tally. */
+function GuideToneHud({ state, keyRoot }: { state: ReturnType<typeof useGuideToneDrill>; keyRoot: PitchClass }) {
+  const { upcoming, lastResult, tally } = state
+  return (
+    <div className={`songlab-guidetone-hud${lastResult ? ` flash-${lastResult}` : ''}`}>
+      {upcoming
+        ? (
+          <span>
+            land the <b>{upcoming.targetLabel} of {upcoming.symbol}</b> — {pcName(upcoming.targetPc, keyRoot)}
+          </span>
+          )
+        : <span className="dim">listening for the next change…</span>}
+      <span className="mono songlab-guidetone-tally">
+        <b className={lastResult === 'hit' ? 'good' : lastResult === 'miss' ? 'bad' : undefined}>{tally.hits}</b>
+        {' / '}{tally.total}
+      </span>
     </div>
   )
 }

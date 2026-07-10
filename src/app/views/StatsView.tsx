@@ -17,6 +17,7 @@ const DRILLS: { id: DrillType; label: string }[] = [
   { id: 'find', label: 'hear → find' },
   { id: 'sing', label: 'name → sing' },
   { id: 'color', label: 'color hunts' },
+  { id: 'chordtone', label: 'guide tones' },
 ]
 
 export function StatsView() {

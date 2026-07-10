@@ -6,7 +6,7 @@ import type { Degree, PitchClass } from '../music-core'
  * drifting toward what's shaky without ever becoming a rigid quiz.
  */
 
-export type DrillType = 'find' | 'sing' | 'triad' | 'color'
+export type DrillType = 'find' | 'sing' | 'triad' | 'color' | 'chordtone'
 
 export interface SkillCell {
   cellKey: string

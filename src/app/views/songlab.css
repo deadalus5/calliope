@@ -94,3 +94,42 @@ input[type='range'] {
 .songlab-countin input[type='checkbox'] {
   accent-color: var(--gold);
 }
+
+.songlab-guidetone-toggle.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #0a1420;
+}
+
+.songlab-guidetone-hud {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: -2px 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #101014;
+  font-size: 14px;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.songlab-guidetone-hud b { color: var(--blue); }
+
+.songlab-guidetone-hud.flash-hit {
+  border-color: var(--good);
+  background: rgba(120, 200, 140, 0.08);
+}
+
+.songlab-guidetone-hud.flash-miss {
+  border-color: var(--bad);
+  background: rgba(220, 100, 100, 0.08);
+}
+
+.songlab-guidetone-tally {
+  margin-left: auto;
+  color: var(--ink-dim);
+  font-size: 15px;
+}
+.songlab-guidetone-tally .good { color: var(--good); font-size: 18px; }
+.songlab-guidetone-tally .bad { color: var(--bad); font-size: 18px; }
