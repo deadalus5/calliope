@@ -1,0 +1,223 @@
+{
+  "id": "salamander",
+  "articulations": {
+    "kick": {
+      "gain": 0,
+      "pan": 0,
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "kick_v1_rr1.ogg",
+            "kick_v1_rr2.ogg",
+            "kick_v1_rr3.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "kick_v2_rr1.ogg",
+            "kick_v2_rr2.ogg",
+            "kick_v2_rr3.ogg"
+          ]
+        }
+      ]
+    },
+    "snare": {
+      "gain": -1,
+      "pan": 0.05,
+      "sendDb": -12,
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "snare_v1_rr1.ogg",
+            "snare_v1_rr2.ogg",
+            "snare_v1_rr3.ogg",
+            "snare_v1_rr4.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "snare_v2_rr1.ogg",
+            "snare_v2_rr2.ogg",
+            "snare_v2_rr3.ogg",
+            "snare_v2_rr4.ogg"
+          ]
+        }
+      ]
+    },
+    "xstick": {
+      "gain": -2,
+      "pan": 0.05,
+      "sendDb": -14,
+      "layers": [
+        {
+          "maxVel": 1,
+          "rr": [
+            "xstick_v1_rr1.ogg",
+            "xstick_v1_rr2.ogg",
+            "xstick_v1_rr3.ogg"
+          ]
+        }
+      ]
+    },
+    "hat-closed": {
+      "gain": -4,
+      "pan": 0.25,
+      "sendDb": -22,
+      "choke": "hat",
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "hat-closed_v1_rr1.ogg",
+            "hat-closed_v1_rr2.ogg",
+            "hat-closed_v1_rr3.ogg",
+            "hat-closed_v1_rr4.ogg",
+            "hat-closed_v1_rr5.ogg",
+            "hat-closed_v1_rr6.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "hat-closed_v2_rr1.ogg",
+            "hat-closed_v2_rr2.ogg",
+            "hat-closed_v2_rr3.ogg",
+            "hat-closed_v2_rr4.ogg",
+            "hat-closed_v2_rr5.ogg",
+            "hat-closed_v2_rr6.ogg"
+          ]
+        }
+      ]
+    },
+    "hat-open": {
+      "gain": -4,
+      "pan": 0.25,
+      "sendDb": -22,
+      "choke": "hat",
+      "chokeable": true,
+      "layers": [
+        {
+          "maxVel": 1,
+          "rr": [
+            "hat-open_v1_rr1.ogg",
+            "hat-open_v1_rr2.ogg",
+            "hat-open_v1_rr3.ogg"
+          ]
+        }
+      ]
+    },
+    "hat-pedal": {
+      "gain": -6,
+      "pan": 0.25,
+      "sendDb": -22,
+      "choke": "hat",
+      "layers": [
+        {
+          "maxVel": 1,
+          "rr": [
+            "hat-pedal_v1_rr1.ogg",
+            "hat-pedal_v1_rr2.ogg",
+            "hat-pedal_v1_rr3.ogg"
+          ]
+        }
+      ]
+    },
+    "ride": {
+      "gain": -3,
+      "pan": 0.3,
+      "sendDb": -18,
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "ride_v1_rr1.ogg",
+            "ride_v1_rr2.ogg",
+            "ride_v1_rr3.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "ride_v2_rr1.ogg",
+            "ride_v2_rr2.ogg",
+            "ride_v2_rr3.ogg"
+          ]
+        }
+      ]
+    },
+    "ride-bell": {
+      "gain": -3,
+      "pan": 0.3,
+      "sendDb": -18,
+      "layers": [
+        {
+          "maxVel": 1,
+          "rr": [
+            "ride-bell_v1_rr1.ogg",
+            "ride-bell_v1_rr2.ogg"
+          ]
+        }
+      ]
+    },
+    "crash": {
+      "gain": -3,
+      "pan": -0.15,
+      "sendDb": -10,
+      "layers": [
+        {
+          "maxVel": 1,
+          "rr": [
+            "crash_v1_rr1.ogg",
+            "crash_v1_rr2.ogg"
+          ]
+        }
+      ]
+    },
+    "tom-hi": {
+      "gain": -2,
+      "pan": -0.2,
+      "sendDb": -14,
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "tom-hi_v1_rr1.ogg",
+            "tom-hi_v1_rr2.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "tom-hi_v2_rr1.ogg",
+            "tom-hi_v2_rr2.ogg"
+          ]
+        }
+      ]
+    },
+    "tom-lo": {
+      "gain": -2,
+      "pan": 0.2,
+      "sendDb": -14,
+      "layers": [
+        {
+          "maxVel": 0.6,
+          "rr": [
+            "tom-lo_v1_rr1.ogg",
+            "tom-lo_v1_rr2.ogg"
+          ]
+        },
+        {
+          "maxVel": 1,
+          "rr": [
+            "tom-lo_v2_rr1.ogg",
+            "tom-lo_v2_rr2.ogg"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "kick": {
+    "gain": 0,
+    "pan": 0,
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/kick_OH_F_1.wav", "OH/kick_OH_F_2.wav", "OH/kick_OH_F_3.wav"] },
+      { "maxVel": 1.0, "src": ["OH/kick_OH_FF_1.wav", "OH/kick_OH_FF_2.wav", "OH/kick_OH_FF_3.wav"] }
+    ]
+  },
+  "snare": {
+    "gain": -1,
+    "pan": 0.05,
+    "sendDb": -12,
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/snare_OH_MP_1.wav", "OH/snare_OH_MP_2.wav", "OH/snare_OH_MP_3.wav", "OH/snare_OH_MP_4.wav"] },
+      { "maxVel": 1.0, "src": ["OH/snare_OH_FF_1.wav", "OH/snare_OH_FF_2.wav", "OH/snare_OH_FF_3.wav", "OH/snare_OH_FF_4.wav"] }
+    ]
+  },
+  "xstick": {
+    "gain": -2,
+    "pan": 0.05,
+    "sendDb": -14,
+    "layers": [
+      { "maxVel": 1.0, "src": ["OH/snareStick_OH_F_1.wav", "OH/snareStick_OH_F_2.wav", "OH/snareStick_OH_F_3.wav"] }
+    ]
+  },
+  "hat-closed": {
+    "gain": -4,
+    "pan": 0.25,
+    "sendDb": -22,
+    "choke": "hat",
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/hihatClosed_OH_P_1.wav", "OH/hihatClosed_OH_P_2.wav", "OH/hihatClosed_OH_P_3.wav", "OH/hihatClosed_OH_P_4.wav", "OH/hihatClosed_OH_P_5.wav", "OH/hihatClosed_OH_P_6.wav"] },
+      { "maxVel": 1.0, "src": ["OH/hihatClosed_OH_F_1.wav", "OH/hihatClosed_OH_F_2.wav", "OH/hihatClosed_OH_F_3.wav", "OH/hihatClosed_OH_F_4.wav", "OH/hihatClosed_OH_F_5.wav", "OH/hihatClosed_OH_F_6.wav"] }
+    ]
+  },
+  "hat-open": {
+    "gain": -4,
+    "pan": 0.25,
+    "sendDb": -22,
+    "choke": "hat",
+    "chokeable": true,
+    "layers": [
+      { "maxVel": 1.0, "src": ["OH/hihatOpen_OH_FF_1.wav", "OH/hihatOpen_OH_FF_2.wav", "OH/hihatOpen_OH_FF_3.wav"] }
+    ]
+  },
+  "hat-pedal": {
+    "gain": -6,
+    "pan": 0.25,
+    "sendDb": -22,
+    "choke": "hat",
+    "layers": [
+      { "maxVel": 1.0, "src": ["OH/hihatFoot_OH_MP_1.wav", "OH/hihatFoot_OH_MP_2.wav", "OH/hihatFoot_OH_MP_3.wav"] }
+    ]
+  },
+  "ride": {
+    "gain": -3,
+    "pan": 0.3,
+    "sendDb": -18,
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/ride1_OH_MP_1.wav", "OH/ride1_OH_MP_2.wav", "OH/ride1_OH_MP_3.wav"] },
+      { "maxVel": 1.0, "src": ["OH/ride1_OH_FF_1.wav", "OH/ride1_OH_FF_2.wav", "OH/ride1_OH_FF_3.wav"] }
+    ]
+  },
+  "ride-bell": {
+    "gain": -3,
+    "pan": 0.3,
+    "sendDb": -18,
+    "layers": [
+      { "maxVel": 1.0, "src": ["OH/ride1Bell_OH_F_1.wav", "OH/ride1Bell_OH_F_2.wav"] }
+    ]
+  },
+  "crash": {
+    "gain": -3,
+    "pan": -0.15,
+    "sendDb": -10,
+    "layers": [
+      { "maxVel": 1.0, "src": ["OH/crash1_OH_FF_1.wav", "OH/crash1_OH_FF_2.wav"] }
+    ]
+  },
+  "tom-hi": {
+    "gain": -2,
+    "pan": -0.2,
+    "sendDb": -14,
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/hiTom_OH_F_1.wav", "OH/hiTom_OH_F_2.wav"] },
+      { "maxVel": 1.0, "src": ["OH/hiTom_OH_FF_1.wav", "OH/hiTom_OH_FF_2.wav"] }
+    ]
+  },
+  "tom-lo": {
+    "gain": -2,
+    "pan": 0.2,
+    "sendDb": -14,
+    "layers": [
+      { "maxVel": 0.6, "src": ["OH/loTom_OH_MP_1.wav", "OH/loTom_OH_MP_2.wav"] },
+      { "maxVel": 1.0, "src": ["OH/loTom_OH_FF_1.wav", "OH/loTom_OH_FF_2.wav"] }
+    ]
+  }
+}
