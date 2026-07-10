@@ -1,0 +1,95 @@
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 18px 28px 60px;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding-bottom: 14px;
+}
+
+.app-title {
+  font-size: 30px;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+}
+
+.app-tagline { color: var(--ink-faint); font-size: 13px; }
+
+.app-nav {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 20px;
+  flex-wrap: wrap;
+}
+
+.app-nav button { font-size: 13.5px; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.controls {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.control-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.control-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--ink-faint);
+  margin-right: 2px;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.seg button {
+  border: none;
+  border-radius: 0;
+  padding: 6px 12px;
+  background: transparent;
+}
+.seg button.active { background: #3a2c17; color: var(--gold); }
+
+.start-gate {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+.start-gate h1 { font-size: 54px; color: var(--gold); }
+.start-gate p { color: var(--ink-dim); max-width: 520px; }
+.start-gate button { font-size: 17px; padding: 12px 34px; }
+
+.vibe-line {
+  font-family: var(--font-display);
+  font-size: 19px;
+  color: var(--ink-dim);
+  font-style: italic;
+  margin: 4px 0 10px;
+}

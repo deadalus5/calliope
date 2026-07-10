@@ -1,0 +1,78 @@
+/* Calliope design tokens — a practice room at night.
+   Rosewood darks, brass and gold for what he owns, electric blue for what
+   each mode adds, ember for what the chord wants, pearl for the live pin. */
+
+@import '@fontsource/instrument-serif';
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+
+:root {
+  --bg: #171109;
+  --surface: #211910;
+  --surface-2: #2a2015;
+  --line: #3a2e1f;
+  --ink: #efe5d3;
+  --ink-dim: #b3a488;
+  --ink-faint: #7d6e55;
+
+  --brass: #c9a96a;
+  --gold: #ecc978;
+  --ember: #e08a5a;
+  --blue: #56c8f0;
+  --pearl: #fff6e3;
+  --good: #9ec97a;
+  --bad: #d96a5a;
+
+  --font-display: 'Instrument Serif', georgia, serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#root { min-height: 100vh; }
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; }
+
+button {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+button:hover { border-color: var(--brass); }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button.active { background: #3a2c17; border-color: var(--gold); color: var(--gold); }
+button.primary { background: var(--gold); border-color: var(--gold); color: #221806; font-weight: 600; }
+button.primary:hover { background: #f5d88e; }
+
+select {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.mono { font-family: var(--font-mono); }
+.dim { color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }

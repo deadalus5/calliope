@@ -1,0 +1,86 @@
+.fretboard {
+  width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.fb-nut { fill: #d8cfc0; }
+.fb-inlay { fill: #e9e2d2; opacity: 0.32; }
+.fb-string { stroke: #b8a98c; opacity: 0.75; }
+.fb-fretnum {
+  fill: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.fb-anchor-name {
+  fill: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-anchor: middle;
+  opacity: 0.85;
+}
+
+.fb-marker { cursor: pointer; }
+.fb-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* --- roles: the app's visual vocabulary ------------------------------- */
+
+/* the pentatonic skeleton: dim brass — always there, never shouting */
+.fb-skeleton .fb-dot { fill: #4a3c28; stroke: #8a714a; stroke-width: 1; }
+.fb-skeleton .fb-label { fill: #c9b48a; }
+
+/* roots: bright gold — the anchor of everything */
+.fb-root .fb-dot { fill: #a07f3d; stroke: #ecc978; stroke-width: 1.6; }
+.fb-root .fb-label { fill: #1c1408; }
+
+/* chord tones: lit ember */
+.fb-chordTone .fb-dot { fill: #b25c2e; stroke: #ff9d5c; stroke-width: 1.4; }
+.fb-chordTone .fb-label { fill: #fff1e2; }
+
+/* modal color notes: electric blue neon */
+.fb-modalColor .fb-dot { fill: #133c4f; stroke: #56c8f0; stroke-width: 1.8; }
+.fb-modalColor .fb-label { fill: #aee7fb; }
+
+/* drill target: pearl ring, waiting */
+.fb-target .fb-dot { fill: rgba(255, 250, 235, 0.09); stroke: #f2e7cd; stroke-width: 1.6; stroke-dasharray: 3 3; }
+.fb-target .fb-label { fill: #f2e7cd; }
+
+/* ghosts: context only */
+.fb-ghost .fb-dot { fill: #2b2318; stroke: #4a3d2c; stroke-width: 0.8; }
+.fb-ghost .fb-label { fill: #6e5f49; }
+
+/* triad shapes */
+.fb-triad .fb-dot { fill: #57352a; stroke: #e08a5a; stroke-width: 1.6; }
+.fb-triad .fb-label { fill: #ffe3cd; }
+
+/* anchor-role markers (rare, letter chips) */
+.fb-anchor .fb-dot { fill: #2e2517; stroke: #6e5f49; stroke-width: 1; }
+.fb-anchor .fb-label { fill: #cbbd9f; }
+
+.fb-ring-circle {
+  fill: none;
+  stroke: #ecc978;
+  stroke-width: 1.4;
+  opacity: 0.9;
+}
+
+/* neon pulse for color notes and live targets */
+@keyframes fb-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.fb-pulse .fb-dot { animation: fb-pulse 2.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-pulse .fb-dot { animation: none; }
+}
