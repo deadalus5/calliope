@@ -21,6 +21,8 @@ export interface NoteMarker {
   pitchClass?: PitchClass
   role: MarkerRole
   label?: string
+  /** Degree relative to the key — drives the marker's hue. */
+  degree?: number
   /** Slow neon pulse (modal colors, drill targets). */
   pulse?: boolean
   /** Extra emphasis ring (e.g. the specific inversion bass note). */

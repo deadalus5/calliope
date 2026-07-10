@@ -7,7 +7,8 @@ import type { FretboardLayer, NoteMarker } from './layers'
 
 /**
  * Translators from music-core objects to fretboard layers. Every module
- * paints through these so the visual language stays consistent.
+ * paints through these so the visual language stays consistent. Markers
+ * carry their degree — the board colors by it.
  */
 
 export function skeletonLayer(
@@ -23,6 +24,7 @@ export function skeletonLayer(
       coord: n.coord,
       role: n.isRoot ? 'root' : 'skeleton',
       label: degreeLabel(n.degree),
+      degree: n.degree,
     })),
   }
 }
@@ -39,7 +41,9 @@ export function neighborGhostLayer(
     zIndex: 5,
     markers: fullNeck(key, kind)
       .filter((n) => !shown.has(`${n.coord.string}:${n.coord.fret}`))
-      .map((n): NoteMarker => ({ coord: n.coord, role: 'ghost', label: degreeLabel(n.degree) })),
+      .map((n): NoteMarker => ({
+        coord: n.coord, role: 'ghost', label: degreeLabel(n.degree), degree: n.degree,
+      })),
   }
 }
 
@@ -52,6 +56,7 @@ export function modeColorLayer(key: PitchClass, mode: ModeSpec): FretboardLayer 
       pitchClass: pcOfDegree(deg, key),
       role: 'modalColor',
       label: degreeLabel(deg, mode.labelOverride),
+      degree: deg,
       pulse: true,
     })),
   }
@@ -63,12 +68,16 @@ export function chordToneLayer(chord: Chord, keyRoot: PitchClass): FretboardLaye
   return {
     id: `chord-${chord.root}-${chord.quality.id}-${bass}`,
     zIndex: 30,
-    markers: chordPcs(chord).map((pc): NoteMarker => ({
-      pitchClass: pc,
-      role: 'chordTone',
-      label: degreeLabel(degreeOf(pc, keyRoot)),
-      ring: normalizePc(pc) === normalizePc(bass),
-    })),
+    markers: chordPcs(chord).map((pc): NoteMarker => {
+      const degree = degreeOf(pc, keyRoot)
+      return {
+        pitchClass: pc,
+        role: 'chordTone',
+        label: degreeLabel(degree),
+        degree,
+        ring: normalizePc(pc) === normalizePc(bass),
+      }
+    }),
   }
 }
 
@@ -77,23 +86,22 @@ export function gripLayer(grip: TriadGrip, keyRoot: PitchClass, id = 'grip'): Fr
   return {
     id,
     zIndex: 40,
-    markers: grip.coords.map((coord, i): NoteMarker => ({
-      coord,
-      role: 'triad',
-      label: degreeLabel(degreeOf(grip.pcs[i], keyRoot)),
-      ring: i === 0,
-    })),
+    markers: grip.coords.map((coord, i): NoteMarker => {
+      const degree = degreeOf(grip.pcs[i], keyRoot)
+      return { coord, role: 'triad', label: degreeLabel(degree), degree, ring: i === 0 }
+    }),
   }
 }
 
 /** A single pitch class as pulsing drill targets across the neck. */
 export function targetLayer(pc: PitchClass, keyRoot: PitchClass, reveal: boolean): FretboardLayer {
+  const degree = degreeOf(pc, keyRoot)
   return {
     id: `target-${pc}-${reveal}`,
     zIndex: 50,
     markers: reveal
       ? coordsForPc(pc).map((coord): NoteMarker => ({
-          coord, role: 'target', label: degreeLabel(degreeOf(pc, keyRoot)), pulse: true,
+          coord, role: 'target', label: degreeLabel(degree), degree, pulse: true,
         }))
       : [],
   }

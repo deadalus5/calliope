@@ -6,78 +6,107 @@
   touch-action: manipulation;
 }
 
-.fb-nut { fill: #d8cfc0; }
-.fb-inlay { fill: #e9e2d2; opacity: 0.32; }
-.fb-string { stroke: #b8a98c; opacity: 0.75; }
+/* ---- the instrument: black board, bright hardware --------------------- */
+
+.fb-board { fill: #060608; stroke: #2e2e36; stroke-width: 1; }
+.fb-nut { fill: #f2ecda; }
+.fb-wire { fill: #7d7a70; }
+.fb-inlay { fill: #464650; }
+.fb-string { stroke: #ded8c4; opacity: 0.92; }
+
 .fb-fretnum {
-  fill: var(--ink-faint);
+  fill: #8f8a7a;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   text-anchor: middle;
 }
 
 .fb-anchor-name {
-  fill: var(--ink-faint);
+  fill: #9a927c;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 10px;
   text-anchor: middle;
-  opacity: 0.85;
 }
+
+/* ---- markers: degree gives the hue (--dc), role gives the treatment --- */
 
 .fb-marker { cursor: pointer; }
 .fb-label {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   text-anchor: middle;
   pointer-events: none;
 }
 
-/* --- roles: the app's visual vocabulary ------------------------------- */
+/* skeleton: his map — outlined in its degree color, quiet but crisp */
+.fb-skeleton .fb-dot { fill: #101014; stroke: var(--dc, #8a8a92); stroke-width: 1.6; }
+.fb-skeleton .fb-label { fill: var(--dc, #cfcabd); }
 
-/* the pentatonic skeleton: dim brass — always there, never shouting */
-.fb-skeleton .fb-dot { fill: #4a3c28; stroke: #8a714a; stroke-width: 1; }
-.fb-skeleton .fb-label { fill: #c9b48a; }
+/* root: always solid gold, always ringed by its own glow */
+.fb-root .fb-dot {
+  fill: var(--dc, #ffc94d);
+  stroke: #fff3d0;
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 6px rgba(255, 201, 77, 0.55));
+}
+.fb-root .fb-label { fill: #1c1404; }
 
-/* roots: bright gold — the anchor of everything */
-.fb-root .fb-dot { fill: #a07f3d; stroke: #ecc978; stroke-width: 1.6; }
-.fb-root .fb-label { fill: #1c1408; }
+/* chord tones: lit solid, glowing — they own the moment */
+.fb-chordTone .fb-dot {
+  fill: var(--dc, #ff8a5c);
+  stroke: #ffffff;
+  stroke-width: 1;
+  filter: drop-shadow(0 0 7px var(--dc, rgba(255, 138, 92, 0.6)));
+}
+.fb-chordTone .fb-label { fill: #14100a; }
 
-/* chord tones: lit ember */
-.fb-chordTone .fb-dot { fill: #b25c2e; stroke: #ff9d5c; stroke-width: 1.4; }
-.fb-chordTone .fb-label { fill: #fff1e2; }
+/* modal color notes: solid + pulse — the paint the mode adds */
+.fb-modalColor .fb-dot {
+  fill: var(--dc, #56c8f0);
+  stroke: #eafaff;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 8px var(--dc, rgba(86, 200, 240, 0.65)));
+}
+.fb-modalColor .fb-label { fill: #0a1216; }
 
-/* modal color notes: electric blue neon */
-.fb-modalColor .fb-dot { fill: #133c4f; stroke: #56c8f0; stroke-width: 1.8; }
-.fb-modalColor .fb-label { fill: #aee7fb; }
-
-/* drill target: pearl ring, waiting */
-.fb-target .fb-dot { fill: rgba(255, 250, 235, 0.09); stroke: #f2e7cd; stroke-width: 1.6; stroke-dasharray: 3 3; }
-.fb-target .fb-label { fill: #f2e7cd; }
+/* drill target: pearl dashed ring, waiting to be found */
+.fb-target .fb-dot {
+  fill: rgba(255, 250, 235, 0.10);
+  stroke: #f5ecd4;
+  stroke-width: 1.8;
+  stroke-dasharray: 3.5 3;
+}
+.fb-target .fb-label { fill: #f5ecd4; }
 
 /* ghosts: context only */
-.fb-ghost .fb-dot { fill: #2b2318; stroke: #4a3d2c; stroke-width: 0.8; }
-.fb-ghost .fb-label { fill: #6e5f49; }
+.fb-ghost .fb-dot { fill: #17171c; stroke: #3c3c46; stroke-width: 1; }
+.fb-ghost .fb-label { fill: #6b6b76; font-size: 10px; }
 
-/* triad shapes */
-.fb-triad .fb-dot { fill: #57352a; stroke: #e08a5a; stroke-width: 1.6; }
-.fb-triad .fb-label { fill: #ffe3cd; }
+/* triad shapes: solid in degree color with a bright rim */
+.fb-triad .fb-dot {
+  fill: var(--dc, #ff8a5c);
+  stroke: #ffffff;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 7px var(--dc, rgba(255, 138, 92, 0.6)));
+}
+.fb-triad .fb-label { fill: #14100a; }
 
-/* anchor-role markers (rare, letter chips) */
-.fb-anchor .fb-dot { fill: #2e2517; stroke: #6e5f49; stroke-width: 1; }
-.fb-anchor .fb-label { fill: #cbbd9f; }
+/* anchor chips */
+.fb-anchor .fb-dot { fill: #1c1c22; stroke: #8f8a7a; stroke-width: 1.2; }
+.fb-anchor .fb-label { fill: #d8d2c0; }
 
 .fb-ring-circle {
   fill: none;
-  stroke: #ecc978;
-  stroke-width: 1.4;
-  opacity: 0.9;
+  stroke: #f5ecd4;
+  stroke-width: 1.6;
+  opacity: 0.95;
 }
 
-/* neon pulse for color notes and live targets */
+/* neon pulse for color notes and revealed targets */
 @keyframes fb-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  50% { opacity: 0.4; }
 }
 .fb-pulse .fb-dot { animation: fb-pulse 2.2s ease-in-out infinite; }
 

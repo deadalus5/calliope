@@ -7,6 +7,7 @@ import { EarGymView } from './views/EarGymView'
 import { TriadAtlasView } from './views/TriadAtlasView'
 import { ModalColorsView } from './views/ModalColorsView'
 import { StatsView } from './views/StatsView'
+import { BoardOptions } from '../fretboard/BoardOptions'
 import './tokens.css'
 import './app.css'
 
@@ -99,6 +100,8 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {module !== 'stats' && <BoardOptions />}
 
       {module === 'explore' && <ExploreView />}
       {module === 'sing' && <SingView />}

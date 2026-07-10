@@ -8,10 +8,10 @@
 @import '@fontsource/ibm-plex-mono/600.css';
 
 :root {
-  --bg: #171109;
-  --surface: #211910;
-  --surface-2: #2a2015;
-  --line: #3a2e1f;
+  --bg: #0d0b08;
+  --surface: #16120c;
+  --surface-2: #201a11;
+  --line: #352c1e;
   --ink: #efe5d3;
   --ink-dim: #b3a488;
   --ink-faint: #7d6e55;
