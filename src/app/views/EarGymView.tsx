@@ -60,6 +60,15 @@ export function EarGymView() {
   const [starting, setStarting] = useState(false)
   const micMode = useAppPrefs((s) => s.micMode)
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The prompt->arm delay. Held in a ref so end() can clear it: a pending
+  // arm() firing after the session ended would start a phantom round over
+  // a stopped UI, whose timeout would chain startRound() forever and log
+  // fabricated misses into the EWMA.
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Session liveness for startRound's async continuation: if end() races
+  // the loadCells await, clearing armTimer isn't enough (it hasn't been set
+  // yet) — the resume must bail instead of re-arming a dead session.
+  const runningRef = useRef(false)
   // Guards for begin()'s async mic grab: startingRef blocks a double-click
   // double-getUserMedia race; disposedRef cancels post-await work after
   // unmount (mirrors the old mount-effect's `cancelled` pattern).
@@ -101,10 +110,12 @@ export function EarGymView() {
     disposedRef.current = false
     return () => {
       disposedRef.current = true
+      runningRef.current = false
       noteTracker.stop()
       stopPitchEngine()
       stopDrone()
       if (nextTimer.current) clearTimeout(nextTimer.current)
+      if (armTimer.current) clearTimeout(armTimer.current)
     }
   }, [])
 
@@ -122,7 +133,9 @@ export function EarGymView() {
   }, [micMode])
 
   useEffect(() => {
-    if (round.phase === 'timeout') {
+    // The running guard is belt-and-braces: even if a stray arm() slipped
+    // past a stopped session, its timeout must not chain a new round.
+    if (round.phase === 'timeout' && running) {
       setReveal(true)
       nextTimer.current = setTimeout(() => startRound(), 2400)
     }
@@ -142,10 +155,12 @@ export function EarGymView() {
 
   const startRound = useCallback(async () => {
     if (nextTimer.current) clearTimeout(nextTimer.current)
+    if (armTimer.current) clearTimeout(armTimer.current)
     setReveal(false)
     round.toPrompt()
     const degrees = degreePool(pool, kind)
     const cells = await loadCells(mode, key, degrees)
+    if (!runningRef.current) return // session ended while we awaited
     const cell = sampleCell(cells, Date.now())
     const degree = cell.degree
     setTarget(degree)
@@ -153,11 +168,11 @@ export function EarGymView() {
     if (mode === 'find') {
       playMidi(promptMidi(pc))
       // arm once the prompt note has spoken
-      setTimeout(() => round.arm(pc), 700)
+      armTimer.current = setTimeout(() => round.arm(pc), 700)
     } else {
       // sing mode: name the degree, replay the root as reference
       playMidi(promptMidi(key))
-      setTimeout(() => round.arm(pc), 900)
+      armTimer.current = setTimeout(() => round.arm(pc), 900)
     }
   }, [round, pool, kind, mode, key])
 
@@ -184,6 +199,7 @@ export function EarGymView() {
       }
     }
     if (disposedRef.current) return
+    runningRef.current = true
     setRunning(true)
     setStats({ hits: 0, misses: 0, streak: 0, lastLatMs: 0 })
     startDrone(key)
@@ -191,12 +207,17 @@ export function EarGymView() {
   }, [key, startRound, micMode])
 
   const end = useCallback(() => {
+    runningRef.current = false
     setRunning(false)
     setTarget(null)
     setReveal(false)
     round.toIdle()
     stopDrone()
     if (nextTimer.current) clearTimeout(nextTimer.current)
+    // A pending prompt->arm must die with the session, or it would arm a
+    // phantom round after end() (mic flip or mode/pool/key change during
+    // the prompt phase) and chain fabricated timeout misses.
+    if (armTimer.current) clearTimeout(armTimer.current)
   }, [round])
 
   const layers = useMemo(() => {
