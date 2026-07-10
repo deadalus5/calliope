@@ -1,0 +1,30 @@
+.sing-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-height: 86px;
+  padding: 6px 4px 12px;
+}
+
+.sing-degree {
+  font-family: var(--font-display);
+  font-size: 64px;
+  line-height: 1;
+  color: var(--pearl);
+  text-shadow: 0 0 24px rgba(255, 246, 227, 0.35);
+}
+
+.sing-name { font-size: 17px; color: var(--ink-dim); }
+.sing-cents { margin-left: 10px; color: var(--ink-faint); font-size: 13px; }
+.sing-idle { color: var(--ink-faint); font-size: 16px; font-style: italic; }
+
+.tuner {
+  display: flex;
+  gap: 22px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
