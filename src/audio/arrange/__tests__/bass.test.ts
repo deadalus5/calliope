@@ -168,6 +168,116 @@ describe('arrangeBass — THE BUG-FIX TEST', () => {
   }
 })
 
+/** All chord-tone pcs of an event, bass foundation included. */
+function chordTonePcs(ev: TimelineEvent): Set<number> {
+  const ct = chordTones(ev)
+  return new Set(
+    [0, ct.rootOffset, ct.third, ct.fifth, ct.sixthOrSeventh].map((off) => normalizePc(ct.root + off)),
+  )
+}
+
+describe('arrangeBass — slash chords anchor intervals on the chord root', () => {
+  /** Non-ghost notes over a specific timeline event. */
+  function notesOver(notes: NoteSpec[], ev: TimelineEvent): NoteSpec[] {
+    const start = ev.bar * BEATS_PER_BAR + ev.beat
+    return notes.filter((n) => !n.ghost && n.atBeat >= start && n.atBeat < start + ev.durationBeats)
+  }
+
+  /** Scalar/enclosure passing tones resolve by step into the next note —
+   * exempt them from chord-tone membership checks (any pc, by design). */
+  function isStepwise(all: NoteSpec[], n: NoteSpec): boolean {
+    const idx = all.indexOf(n)
+    const next = all[idx + 1]
+    if (!next) return true // cannot judge the final note of the output
+    return Math.abs(n.midis[0] - next.midis[0]) <= 2
+  }
+
+  it('boogie over lydian-vamp D/C walks C–F#–A–B, never E or G (the old bug)', () => {
+    const timeline = buildTimeline(progressionById('lydian-vamp'), PC.C)
+    const dOverC = timeline[1]
+    expect(dOverC.symbol).toBe('D/C')
+    const notes = arrangeBass(timeline, 'boogie', BEATS_PER_BAR, mulberry32(7)).filter((n) => !n.ghost)
+    const over = notesOver(notes, dOverC)
+    expect(over.length).toBeGreaterThan(0)
+    const pcs = over.map((n) => normalizePc(n.midis[0]))
+    // No approach beats exist here: Cmaj7 and D/C share the same bass pc (C).
+    for (const pc of pcs) expect([PC.C, PC.Fs, PC.A, PC.B]).toContain(pc)
+    expect(pcs).toContain(PC.Fs) // the #4 color the song exists to teach
+    expect(pcs).not.toContain(PC.E) // old bug: intervals anchored on the C bass
+    expect(pcs).not.toContain(PC.G)
+  })
+
+  it('walking over lydian-vamp D/C reaches F# and never lands wrong-anchored tones', () => {
+    const timeline = buildTimeline(progressionById('lydian-vamp'), PC.C)
+    const dOverC = timeline[1]
+    const all = arrangeBass(timeline, 'walking', BEATS_PER_BAR, mulberry32(11)).filter((n) => !n.ghost)
+    const over = notesOver(all, dOverC)
+    expect(over.length).toBeGreaterThan(0)
+    const allowed = chordTonePcs(dOverC) // {C, D, F#, A, B}
+    for (const n of over) {
+      if (isStepwise(all, n)) continue // scalar passing tone, resolves by step
+      expect(allowed.has(normalizePc(n.midis[0]))).toBe(true)
+    }
+    expect(over.map((n) => normalizePc(n.midis[0]))).toContain(PC.Fs)
+  })
+
+  it("walking over phrygian-vamp F/E stays on F chord tones, never E-major's G#/B", () => {
+    const timeline = buildTimeline(progressionById('phrygian-vamp'), PC.E)
+    const fOverE = timeline[1]
+    expect(fOverE.symbol).toBe('F/E')
+    const all = arrangeBass(timeline, 'walking', BEATS_PER_BAR, mulberry32(3)).filter((n) => !n.ghost)
+    const over = notesOver(all, fOverE)
+    expect(over.length).toBeGreaterThan(0)
+    const allowed = chordTonePcs(fOverE) // {E, F, A, C, D}
+    for (const n of over) {
+      if (isStepwise(all, n)) continue
+      const pc = normalizePc(n.midis[0])
+      // The old bug played E-major intervals over the E bass: G# and B.
+      expect(pc).not.toBe(PC.Gs)
+      expect(pc).not.toBe(PC.B)
+      expect(allowed.has(pc)).toBe(true)
+    }
+  })
+
+  it('gravity C/G still walks from the G bass on every strong beat', () => {
+    const timeline = buildTimeline(progressionById('gravity'), PC.G)
+    const cOverG = timeline[1]
+    expect(cOverG.symbol).toBe('C/G')
+    const all = arrangeBass(timeline, 'walking', BEATS_PER_BAR, mulberry32(5)).filter((n) => !n.ghost)
+    const downbeats = notesOver(all, cOverG).filter((n) => n.atBeat % BEATS_PER_BAR === 0)
+    expect(downbeats.length).toBeGreaterThan(0)
+    // Both the foundation (G) and the fifth-of-C (also G!) sit on pc 7.
+    for (const n of downbeats) expect(normalizePc(n.midis[0])).toBe(PC.G)
+  })
+})
+
+describe('arrangeBass — walking scalar lines resolve into their target', () => {
+  const timeline = buildTimeline(progressionById('blues-12-standard'), PC.A)
+
+  function isApproachBeat(atBeat: number): boolean {
+    const ev = findEvent(timeline, atBeat)
+    if (atBeat !== ev.bar * BEATS_PER_BAR + ev.beat + ev.durationBeats - 1) return false
+    const idx = timeline.indexOf(ev)
+    const next = timeline[(idx + 1) % timeline.length]
+    return normalizePc(chordTones(next).bassPc) !== normalizePc(chordTones(ev).bassPc)
+  }
+
+  it('a non-chord-tone beat before a downbeat resolves into it within 2 semitones', () => {
+    for (const seed of [1, 2, 3, 42]) {
+      const notes = arrangeBass(timeline, 'walking', BEATS_PER_BAR, mulberry32(seed)).filter((n) => !n.ghost)
+      for (let i = 1; i < notes.length; i++) {
+        const down = notes[i]
+        if (down.atBeat % BEATS_PER_BAR !== 0) continue // only strong beats
+        const prev = notes[i - 1]
+        if (prev.atBeat !== down.atBeat - 1) continue
+        if (isApproachBeat(prev.atBeat)) continue // the approach rule has its own test
+        if (chordTonePcs(findEvent(timeline, prev.atBeat)).has(normalizePc(prev.midis[0]))) continue
+        expect(Math.abs(prev.midis[0] - down.midis[0])).toBeLessThanOrEqual(2)
+      }
+    }
+  })
+})
+
 function hashOf(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0

@@ -12,14 +12,23 @@ import type { BassStyle, NoteSpec } from './types'
 export interface ChordTones {
   /** Bass foundation pitch class (walks to the slash bass for e.g. C/G). */
   bassPc: PitchClass
-  /** Un-folded root midi, 36 + normalizePc(bassPc); always in [36,47]. */
+  /** Un-folded foundation midi, 36 + normalizePc(bassPc); always in [36,47]. */
   root: number
-  /** Semitone offset of the third: minor (3) or major (4), sus fallback. */
+  /**
+   * Semitones from the bass foundation UP to the actual chord root — 0 for
+   * root-position chords, nonzero for slash chords. quality.intervals are
+   * relative to chord.root, so every tone offset below already includes it
+   * (e.g. D/C: third = 2 + 4 = 6, landing on F# above the C bass, not E).
+   */
+  rootOffset: number
+  /** Offset from `root` to the chord's third (pc-correct for slash chords). */
   third: number
-  /** Semitone offset of the fifth: perfect (7), or dim (6) / aug (8). */
+  /** Offset from `root` to the chord's fifth (pc-correct for slash chords). */
   fifth: number
-  /** The "sixth-or-seventh" color tone above the fifth — the bug-fix slot. */
+  /** Offset from `root` to the sixth-or-seventh color tone — the bug-fix slot. */
   sixthOrSeventh: number
+  /** True when the quality is minor-third (has 3, not 4) — drives boogie's 6-vs-b7. */
+  minorThird: boolean
 }
 
 function findThird(intervals: number[]): number {
@@ -47,12 +56,21 @@ function findSixthOrSeventh(intervals: number[], third: number): number {
 
 export function chordTones(ev: TimelineEvent): ChordTones {
   const intervals = ev.chord.quality.intervals
-  const third = findThird(intervals)
-  const fifth = findFifth(intervals)
-  const sixthOrSeventh = findSixthOrSeventh(intervals, third)
+  const rawThird = findThird(intervals)
+  const rawFifth = findFifth(intervals)
+  const rawSixthOrSeventh = findSixthOrSeventh(intervals, rawThird)
   const bassPc = chordBass(ev.chord)
+  const rootOffset = normalizePc(ev.chord.root - bassPc)
   const root = 36 + normalizePc(bassPc)
-  return { bassPc, root, third, fifth, sixthOrSeventh }
+  return {
+    bassPc,
+    root,
+    rootOffset,
+    third: rootOffset + rawThird,
+    fifth: rootOffset + rawFifth,
+    sixthOrSeventh: rootOffset + rawSixthOrSeventh,
+    minorThird: intervals.includes(3) && !intervals.includes(4),
+  }
 }
 
 /** Fold any midi into the working bass register, E1..G3. */
@@ -131,48 +149,83 @@ function arrangeWalking(timeline: TimelineEvent[], beatsPerBar: number, rng: () 
   for (let i = 0; i < timeline.length; i++) {
     const { ev, ct, nextCt, changeComing } = nextChangeInfo(timeline, i)
     const toneCycle = [ct.third, ct.fifth, ct.sixthOrSeventh]
-    let shapeSkip = true
-    let shapeAsc = true
-    for (let b = 0; b < ev.durationBeats; b++) {
-      const barPos = b % beatsPerBar
-      const atBeat = ev.bar * beatsPerBar + ev.beat + b
-      const isLastBeatOfChord = b === ev.durationBeats - 1
-      if (barPos === 0) {
-        shapeSkip = rng() < 0.5
-        shapeAsc = rng() < 0.5
+    const bars = Math.ceil(ev.durationBeats / beatsPerBar)
+
+    // Scalar passing tones must not land on the pcs the bug fix banned:
+    // over a minor chord, never the major third, and never the major 6th
+    // unless the quality actually contains interval 9.
+    const chordRootPc = normalizePc(ct.root + ct.rootOffset)
+    const clashes = (m: number): boolean => {
+      if (!ct.minorThird) return false
+      const rel = normalizePc(m - chordRootPc)
+      return rel === 4 || (rel === 9 && !ev.chord.quality.intervals.includes(9))
+    }
+
+    // Decide every bar's downbeat UP FRONT so scalar bars can aim at a real
+    // target instead of leading a half-step into a note that then lands
+    // somewhere else (the unresolved-leading-tone bug).
+    const downbeats: number[] = [foldBass(ct.root)]
+    for (let barIdx = 1; barIdx < bars; barIdx++) {
+      downbeats.push(foldBass(rng() < 0.6 ? ct.root : ct.root + ct.fifth))
+    }
+
+    for (let barIdx = 0; barIdx < bars; barIdx++) {
+      const barStart = barIdx * beatsPerBar
+      const beatsInBar = Math.min(beatsPerBar, ev.durationBeats - barStart)
+      const atBeat0 = ev.bar * beatsPerBar + ev.beat + barStart
+
+      pushNote(out, downbeats[barIdx], ct.root + ct.fifth, atBeat0, 0.9, 0.95)
+      let cur = out[out.length - 1].midis[0]
+
+      const shapeSkip = rng() < 0.5
+      const shapeAsc = rng() < 0.5
+      // The strong beat this bar walks toward: next bar's (pre-rolled)
+      // downbeat, or the next chord's entry root at the end of the chord.
+      // This is the EXACT midi that strong beat will play — the scalar line
+      // must resolve into it, not into another octave of it.
+      const target = barIdx + 1 < bars ? downbeats[barIdx + 1] : foldBass(nextCt.root)
+      const isChordEnd = barIdx === bars - 1
+      const lastMiddlePos = beatsInBar - 1 - (isChordEnd && changeComing ? 1 : 0)
+
+      for (let barPos = 1; barPos < beatsInBar; barPos++) {
+        const b = barStart + barPos
+        const atBeat = atBeat0 + barPos
+        const isLastBeatOfChord = b === ev.durationBeats - 1
+        let midi: number
+        let alt: number
+        if (isLastBeatOfChord && changeComing) {
+          midi = approachNote(rng, nextCt.root)
+          alt = nextCt.root
+        } else if (shapeSkip) {
+          const idx = (barPos - 1) % toneCycle.length
+          midi = ct.root + toneCycle[shapeAsc ? idx : toneCycle.length - 1 - idx]
+          alt = ct.root + ct.fifth
+        } else {
+          // Scalar/enclosure motion toward the decided target: steps of 1–2
+          // semitones, closing with a neighbor tone (target±1) so the line
+          // resolves by step into the downbeat it was aiming at.
+          const slotsLeft = lastMiddlePos - barPos + 1
+          if (slotsLeft <= 1) {
+            const side = cur > target ? 1 : cur < target ? -1 : rng() < 0.5 ? 1 : -1
+            midi = target + side
+            if (midi > 55 || midi < 28 || clashes(midi)) midi = target - side
+          } else {
+            const dist = target - cur
+            const sign = dist === 0 ? (rng() < 0.5 ? 1 : -1) : Math.sign(dist)
+            const mag = Math.max(1, Math.min(2, Math.abs(Math.round(dist / slotsLeft))))
+            midi = cur + sign * mag
+            if (clashes(midi)) midi += sign // pass over the banned pc
+            if (midi > 55 || midi < 28) {
+              midi = cur - sign * mag
+              if (clashes(midi)) midi -= sign
+            }
+          }
+          alt = ct.root + ct.fifth
+        }
+        pushNote(out, midi, alt, atBeat, 0.9, 0.8 + (rng() - 0.5) * 0.04)
+        cur = out[out.length - 1].midis[0]
+        if ((barPos === 1 || barPos === 3) && rng() < 0.3) pushGhost(out, atBeat + 0.5)
       }
-      let midi: number
-      let vel: number
-      let alt: number
-      if (isLastBeatOfChord && changeComing) {
-        midi = approachNote(rng, nextCt.root)
-        alt = nextCt.root
-        vel = 0.8 + (rng() - 0.5) * 0.04
-      } else if (b === 0) {
-        midi = ct.root
-        alt = ct.root + ct.fifth
-        vel = 0.95
-      } else if (barPos === 0) {
-        midi = rng() < 0.6 ? ct.root : ct.root + ct.fifth
-        alt = ct.root
-        vel = 0.95
-      } else if (shapeSkip) {
-        const idx = (barPos - 1) % toneCycle.length
-        const tone = toneCycle[shapeAsc ? idx : toneCycle.length - 1 - idx]
-        midi = ct.root + tone
-        alt = ct.root + ct.fifth
-        vel = 0.8 + (rng() - 0.5) * 0.04
-      } else {
-        // Scalar/enclosure motion back toward the root at the top of the
-        // next bar: small steps with the last one leaning in from a
-        // half-step above (a classic bebop-style enclosure).
-        const scalarOffsets = [2, 1, -1]
-        midi = ct.root + scalarOffsets[(barPos - 1) % scalarOffsets.length]
-        alt = ct.root + ct.fifth
-        vel = 0.8 + (rng() - 0.5) * 0.04
-      }
-      pushNote(out, midi, alt, atBeat, 0.9, vel)
-      if ((barPos === 1 || barPos === 3) && rng() < 0.3) pushGhost(out, atBeat + 0.5)
     }
   }
   return out
@@ -185,12 +238,14 @@ function arrangeBoogie(timeline: TimelineEvent[], beatsPerBar: number, rng: () =
   const out: NoteSpec[] = []
   for (let i = 0; i < timeline.length; i++) {
     const { ev, ct, nextCt, changeComing } = nextChangeInfo(timeline, i)
-    const seventh = ev.chord.quality.intervals.includes(11) ? 11 : 10
+    // seventh/sixth are intervals above the CHORD ROOT, so they carry the
+    // slash-chord rootOffset just like third/fifth do.
+    const seventh = ct.rootOffset + (ev.chord.quality.intervals.includes(11) ? 11 : 10)
     // The classic boogie "6" passing tone is a literal major 6th over
     // major/dominant chords (the shuffle sound) — but NOT over a minor
     // chord, where that would reintroduce the exact bug this task fixes.
     // Over minor chords we reuse the bug-fixed sixthOrSeventh tone instead.
-    const sixthTone = ct.third === 3 ? ct.sixthOrSeventh : 9
+    const sixthTone = ct.minorThird ? ct.sixthOrSeventh : ct.rootOffset + 9
     const evenPattern = [0, ct.third, ct.fifth, sixthTone]
     const oddPattern = [seventh, sixthTone, ct.fifth, ct.third]
     for (let b = 0; b < ev.durationBeats; b++) {
@@ -224,8 +279,10 @@ function arrangeRootFive(timeline: TimelineEvent[], beatsPerBar: number, rng: ()
   const out: NoteSpec[] = []
   for (let i = 0; i < timeline.length; i++) {
     const { ev, ct, nextCt, changeComing } = nextChangeInfo(timeline, i)
+    // Drop the alternating fifth an octave (same pitch class — root−5 would
+    // be wrong for slash chords) when it would sit in the guitar register.
     const naiveFifth = ct.root + ct.fifth
-    const fifthMidi = naiveFifth >= 48 ? ct.root - 5 : naiveFifth
+    const fifthMidi = naiveFifth >= 48 ? naiveFifth - 12 : naiveFifth
     const totalBeats = ev.durationBeats
     const bars = Math.ceil(totalBeats / beatsPerBar)
     for (let barIdx = 0; barIdx < bars; barIdx++) {
