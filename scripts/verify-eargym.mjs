@@ -33,9 +33,16 @@ await page.addInitScript(() => {
 await page.goto('http://127.0.0.1:5173')
 await page.click('button:has-text("Pick up the guitar")')
 await page.click('nav button:has-text("Ear Gym")')
-await page.evaluate(() => globalThis.__fakeToneCtx?.resume())
-await page.waitForTimeout(1200)
+// Task 11: the mount-effect mic grab is gone — opening the view no longer
+// touches getUserMedia. The fake tone context isn't created until "start"
+// is clicked (mic mode defaults to 'on'), so click first, then wait for it
+// to exist before resuming it.
 await page.click('button:has-text("start")')
+for (let i = 0; i < 30; i++) {
+  if (await page.evaluate(() => !!globalThis.__fakeToneCtx)) break
+  await page.waitForTimeout(100)
+}
+await page.evaluate(() => globalThis.__fakeToneCtx?.resume())
 // watch the scoreboard until at least 2 hits registered (or 40s)
 let final = ''
 for (let i = 0; i < 80; i++) {

@@ -20,6 +20,8 @@
 
 .gym-heard { color: var(--bad); font-size: 15px; }
 
+.gym-hint { font-size: 13px; margin: -4px 0 6px; }
+
 .gym-score { margin-left: auto; font-size: 15px; color: var(--ink-dim); }
 .gym-score .good { color: var(--good); font-size: 18px; }
 .gym-streak { color: var(--gold); margin-left: 8px; }

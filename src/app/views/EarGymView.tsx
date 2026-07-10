@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { playMidi } from '../../audio/audition'
 import { startDrone, stopDrone } from '../../audio/drone'
+import { exposeDebug } from '../../audio/debug'
 import { Fretboard } from '../../fretboard/Fretboard'
 import { skeletonLayer, targetLayer } from '../../fretboard/build-layers'
 import type { FretboardLayer } from '../../fretboard/layers'
 import {
   DEGREE_LABELS, DEGREE_NAMES, PC, PENTATONIC_DEGREES, coordToMidi, degreeLabel,
-  degreeOf, modeById, pcName, pcOfDegree,
-  type Degree, type PentatonicKind, type PitchClass,
+  degreeOf, modeById, normalizePc, pcName, pcOfDegree,
+  type Degree, type FretCoord, type PentatonicKind, type PitchClass,
 } from '../../music-core'
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
+import { reportMicFailure } from '../../pitch/mic-errors'
 import { usePitchRound } from '../../drills/engine/use-pitch-round'
 import { loadCells, recordAttempt } from '../../state/db'
 import { sampleCell } from '../../state/skill-model'
+import { useAppPrefs } from '../../state/app-prefs'
 import './eargym.css'
 
 /**
@@ -54,7 +57,7 @@ export function EarGymView() {
   const [target, setTarget] = useState<Degree | null>(null)
   const [reveal, setReveal] = useState(false)
   const [stats, setStats] = useState({ hits: 0, misses: 0, streak: 0, lastLatMs: 0 })
-  const [micError, setMicError] = useState<string | null>(null)
+  const micMode = useAppPrefs((s) => s.micMode)
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const round = usePitchRound({
@@ -63,6 +66,7 @@ export function EarGymView() {
       void recordAttempt({
         ts: Date.now(), drill: mode, degree: target, key,
         correct: r.correct, latencyMs: r.latencyMs,
+        detail: r.via === 'tap' ? 'tap' : undefined,
       })
       setStats((s) => ({
         hits: s.hits + (r.correct ? 1 : 0),
@@ -82,27 +86,24 @@ export function EarGymView() {
     },
   })
 
-  // Mic lifecycle while the gym is open.
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        await startPitchEngine()
-        if (cancelled) return
-        await calibrateNoiseFloor(0.8)
-        noteTracker.start()
-      } catch {
-        if (!cancelled) setMicError('The Ear Gym needs the microphone — allow mic access and reload.')
-      }
-    })()
-    return () => {
-      cancelled = true
-      noteTracker.stop()
-      stopPitchEngine()
-      stopDrone()
-      if (nextTimer.current) clearTimeout(nextTimer.current)
-    }
+  // Opening the view never grabs the mic — that only happens on "begin",
+  // and only when micMode is 'on'. Unmount still tears everything down.
+  useEffect(() => () => {
+    noteTracker.stop()
+    stopPitchEngine()
+    stopDrone()
+    if (nextTimer.current) clearTimeout(nextTimer.current)
   }, [])
+
+  // Sing needs the mic; if the pref flips off mid-session, fall back to
+  // find rather than leaving an un-scoreable mode selected.
+  useEffect(() => {
+    if (micMode === 'off' && mode === 'sing') {
+      setMode('find')
+      if (running) end()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micMode])
 
   useEffect(() => {
     if (round.phase === 'timeout') {
@@ -111,6 +112,17 @@ export function EarGymView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round.phase])
+
+  // E2E introspection only (verify-nomic.mjs): the deterministic target pc
+  // for the active round, so a tap-answer script can find and click it
+  // without guessing.
+  useEffect(() => {
+    exposeDebug({
+      eargymTargetPc: target !== null ? pcOfDegree(target, key) : null,
+      eargymPhase: round.phase,
+      eargymHits: stats.hits,
+    })
+  }, [target, key, round.phase, stats.hits])
 
   const startRound = useCallback(async () => {
     if (nextTimer.current) clearTimeout(nextTimer.current)
@@ -133,12 +145,22 @@ export function EarGymView() {
     }
   }, [round, pool, kind, mode, key])
 
-  const begin = useCallback(() => {
+  const begin = useCallback(async () => {
+    if (micMode === 'on') {
+      try {
+        await startPitchEngine()
+        await calibrateNoiseFloor(0.8)
+        noteTracker.start()
+      } catch (err) {
+        reportMicFailure(err)
+        return // don't silently pretend the round runs mic-scored
+      }
+    }
     setRunning(true)
     setStats({ hits: 0, misses: 0, streak: 0, lastLatMs: 0 })
     startDrone(key)
     void startRound()
-  }, [key, startRound])
+  }, [key, startRound, micMode])
 
   const end = useCallback(() => {
     setRunning(false)
@@ -154,6 +176,19 @@ export function EarGymView() {
     if (target !== null && reveal) out.push(targetLayer(pcOfDegree(target, key), key, true))
     return out
   }, [key, kind, target, reveal])
+
+  // No-mic mode's answer path: a fretboard tap is a first-class answer for
+  // "find". Never offered when micMode is 'on' — keeps mic-mode data
+  // comparable and preserves the board's normal audition-on-click behavior.
+  const noMicFind = micMode === 'off' && mode === 'find'
+  const tapAnswerable = noMicFind && (round.phase === 'listen' || round.phase === 'miss')
+  const handleNoteClick = useCallback((c: FretCoord) => {
+    if (tapAnswerable) {
+      round.answer(normalizePc(coordToMidi(c)))
+      return
+    }
+    if (!running) playMidi(coordToMidi(c))
+  }, [tapAnswerable, running, round])
 
   const phaseText: Record<string, string> = {
     idle: 'press start when the guitar is in your hands',
@@ -190,7 +225,12 @@ export function EarGymView() {
               <button className={mode === 'find' ? 'active' : ''} onClick={() => { setMode('find'); if (running) end() }}>
                 hear → find
               </button>
-              <button className={mode === 'sing' ? 'active' : ''} onClick={() => { setMode('sing'); if (running) end() }}>
+              <button
+                className={mode === 'sing' ? 'active' : ''}
+                disabled={micMode === 'off'}
+                title={micMode === 'off' ? "needs the mic — you're in no-mic mode" : undefined}
+                onClick={() => { setMode('sing'); if (running) end() }}
+              >
                 name → sing
               </button>
             </div>
@@ -210,8 +250,12 @@ export function EarGymView() {
             : <button className="primary" onClick={begin}>start</button>}
         </div>
 
+        {noMicFind && (
+          <p className="gym-hint dim">no-mic: tap your answer on the board</p>
+        )}
+
         <div className={`gym-status gym-${round.phase}`}>
-          <span className="gym-phase">{micError ?? phaseText[round.phase]}</span>
+          <span className="gym-phase">{phaseText[round.phase]}</span>
           {round.phase === 'miss' && round.heard !== null && (
             <span className="gym-heard">
               you played the {degreeLabel(degreeOf(round.heard, key))} ({pcName(round.heard, key)})
@@ -224,7 +268,7 @@ export function EarGymView() {
           </span>
         </div>
 
-        <Fretboard layers={layers} keyRoot={key} onNoteClick={(c) => !running && playMidi(coordToMidi(c))} />
+        <Fretboard layers={layers} keyRoot={key} onNoteClick={handleNoteClick} />
       </div>
     </div>
   )

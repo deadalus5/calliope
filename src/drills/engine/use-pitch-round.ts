@@ -16,6 +16,10 @@ export interface RoundResult {
   correct: boolean
   latencyMs: number
   heardPc: PitchClass | null
+  /** Where the answer came from — a locked mic note, or a fretboard tap
+   *  (no-mic mode). Callers use this to tag Attempt.detail for segmentable
+   *  skill-model data; it carries no fabricated latency semantics. */
+  via: 'mic' | 'tap'
 }
 
 interface UseRoundOpts {
@@ -50,6 +54,31 @@ export function usePitchRound({ timeoutMs = 9000, huntUntilCorrect = true, onSco
 
   useEffect(() => () => clear(), [clear])
 
+  /** Shared scoring body for both a mic lock event and a fretboard tap
+   *  (`answer`) — identical correctness/latency/phase logic either way. */
+  const scoreOnce = useCallback((pc: PitchClass, atSeconds: number, via: 'mic' | 'tap') => {
+    if (target.current === null) return
+    setHeard(pc)
+    const correct = pc === target.current
+    if (!scored.current) {
+      scored.current = true
+      const latencyMs = Math.max(0, (atSeconds - armAt.current) * 1000)
+      onScoredRef.current({ correct, latencyMs: correct ? latencyMs : 0, heardPc: pc, via })
+      if (correct) {
+        setPhase('hit')
+        clear()
+      } else {
+        setPhase('miss')
+        if (!huntUntilCorrect) clear()
+      }
+    } else if (correct) {
+      // found it after the miss — end the hunt
+      clear()
+      onFoundRef.current?.()
+      setPhase('hit')
+    }
+  }, [clear, huntUntilCorrect])
+
   /** Enter listening: called once the prompt has finished sounding. */
   const arm = useCallback((targetPc: PitchClass) => {
     clear()
@@ -60,39 +89,27 @@ export function usePitchRound({ timeoutMs = 9000, huntUntilCorrect = true, onSco
     armAt.current = audioNow()
     unsub.current = noteTracker.on((e) => {
       if (e.type !== 'lock' || target.current === null) return
-      const pc = e.pitch.pc
-      setHeard(pc)
-      const correct = pc === target.current
-      if (!scored.current) {
-        scored.current = true
-        const latencyMs = Math.max(0, (e.pitch.t - armAt.current) * 1000)
-        onScoredRef.current({ correct, latencyMs: correct ? latencyMs : 0, heardPc: pc })
-        if (correct) {
-          setPhase('hit')
-          clear()
-        } else {
-          setPhase('miss')
-          if (!huntUntilCorrect) clear()
-        }
-      } else if (correct) {
-        // found it after the miss — end the hunt
-        clear()
-        onFoundRef.current?.()
-        setPhase('hit')
-      }
+      scoreOnce(e.pitch.pc, e.pitch.t, 'mic')
     })
     timer.current = setTimeout(() => {
       if (!scored.current) {
         scored.current = true
-        onScoredRef.current({ correct: false, latencyMs: 0, heardPc: null })
+        onScoredRef.current({ correct: false, latencyMs: 0, heardPc: null, via: 'mic' })
       }
       clear()
       setPhase('timeout')
     }, timeoutMs)
-  }, [clear, huntUntilCorrect, timeoutMs])
+  }, [clear, scoreOnce, timeoutMs])
+
+  /** A fretboard tap as a first-class answer — no-mic mode's "find" path.
+   *  Scores exactly like a mic lock event (same correctness/latency/phase
+   *  logic, extracted above as scoreOnce). */
+  const answer = useCallback((pc: PitchClass) => {
+    scoreOnce(pc, audioNow(), 'tap')
+  }, [scoreOnce])
 
   const toPrompt = useCallback(() => { clear(); setPhase('prompt') }, [clear])
   const toIdle = useCallback(() => { clear(); setPhase('idle') }, [clear])
 
-  return { phase, heard, arm, toPrompt, toIdle }
+  return { phase, heard, arm, answer, toPrompt, toIdle }
 }

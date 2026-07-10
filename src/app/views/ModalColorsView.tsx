@@ -12,8 +12,10 @@ import {
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
+import { reportMicFailure } from '../../pitch/mic-errors'
 import { usePitchRound } from '../../drills/engine/use-pitch-round'
 import { recordAttempt } from '../../state/db'
+import { useAppPrefs } from '../../state/app-prefs'
 import './modalcolors.css'
 
 /**
@@ -70,6 +72,7 @@ export function ModalColorsView() {
   const [huntTarget, setHuntTarget] = useState<Degree | null>(null)
   const [reveal, setReveal] = useState(false)
   const [score, setScore] = useState({ hits: 0, tries: 0 })
+  const micMode = useAppPrefs((s) => s.micMode)
   const micReady = useRef(false)
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -140,7 +143,8 @@ export function ModalColorsView() {
         await calibrateNoiseFloor(0.8)
         noteTracker.start()
         micReady.current = true
-      } catch {
+      } catch (err) {
+        reportMicFailure(err)
         return // no mic — hunt can't run
       }
     }
@@ -149,6 +153,14 @@ export function ModalColorsView() {
     if (!sequencer.playing) startVamp()
     nextHunt()
   }, [nextHunt, startVamp])
+
+  // Global mic-off flips mid-hunt: the engine already died (MicToggle stops
+  // it), so end the hunt rather than leaving a stuck "listening" UI.
+  useEffect(() => {
+    micReady.current = micMode === 'on' && micReady.current
+    if (micMode === 'off' && hunting) endHunt()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micMode])
 
   const endHunt = useCallback(() => {
     setHunting(false)
@@ -204,7 +216,15 @@ export function ModalColorsView() {
           </button>
           {hunting
             ? <button onClick={endHunt}>end hunt</button>
-            : <button onClick={beginHunt}>hunt the colors (mic)</button>}
+            : (
+              <button
+                disabled={micMode === 'off'}
+                title={micMode === 'off' ? 'hunt needs the mic — no-mic mode is on' : undefined}
+                onClick={beginHunt}
+              >
+                hunt the colors (mic)
+              </button>
+            )}
         </div>
 
         {hunting && (

@@ -73,6 +73,14 @@
 }
 .seg button.active { background: #3a2c17; color: var(--gold); }
 
+.options-shelf {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.options-shelf .board-options { flex: 1 1 auto; }
+
 .start-gate {
   min-height: 70vh;
   display: flex;

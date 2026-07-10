@@ -9,6 +9,7 @@ import { SlashGuideView } from './views/SlashGuideView'
 import { ModalColorsView } from './views/ModalColorsView'
 import { StatsView } from './views/StatsView'
 import { BoardOptions } from '../fretboard/BoardOptions'
+import { MicToggle } from './components/MicToggle'
 import { ToastHost } from './components/Toast'
 import './tokens.css'
 import './app.css'
@@ -55,9 +56,9 @@ export default function App() {
     }
   }, [])
 
-  if (!ready) {
-    return (
-      <>
+  return (
+    <>
+      {!ready ? (
         <div className="start-gate">
           <h1>Calliope</h1>
           <p>
@@ -83,46 +84,48 @@ export default function App() {
             {loading ? 'tuning up…' : 'Pick up the guitar'}
           </button>
         </div>
-        <ToastHost />
-      </>
-    )
-  }
+      ) : (
+        <div className="app">
+          <header className="app-header">
+            <h1 className="app-title">Calliope</h1>
+            <span className="app-tagline">skeleton + colors</span>
+          </header>
 
-  return (
-    <div className="app">
-      <header className="app-header">
-        <h1 className="app-title">Calliope</h1>
-        <span className="app-tagline">skeleton + colors</span>
-      </header>
+          <nav className="app-nav">
+            {MODULES.map((m) => (
+              <button
+                key={m.id}
+                className={module === m.id ? 'active' : ''}
+                onClick={() => setModule(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </nav>
 
-      <nav className="app-nav">
-        {MODULES.map((m) => (
-          <button
-            key={m.id}
-            className={module === m.id ? 'active' : ''}
-            onClick={() => setModule(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </nav>
+          {module !== 'stats' && (
+            <div className="options-shelf">
+              <BoardOptions />
+              <MicToggle />
+            </div>
+          )}
 
-      {module !== 'stats' && <BoardOptions />}
-
-      {module === 'explore' && <ExploreView />}
-      {module === 'sing' && <SingView />}
-      {module === 'eargym' && <EarGymView />}
-      {module === 'triads' && <TriadAtlasView />}
-      {module === 'slash' && <SlashGuideView />}
-      {module === 'modes' && <ModalColorsView />}
-      {module === 'songlab' && <SongLabView />}
-      {module === 'jam' && (
-        <Suspense fallback={<div className="panel dim">tuning in…</div>}>
-          <SpotifyView />
-        </Suspense>
+          {module === 'explore' && <ExploreView />}
+          {module === 'sing' && <SingView />}
+          {module === 'eargym' && <EarGymView />}
+          {module === 'triads' && <TriadAtlasView />}
+          {module === 'slash' && <SlashGuideView />}
+          {module === 'modes' && <ModalColorsView />}
+          {module === 'songlab' && <SongLabView />}
+          {module === 'jam' && (
+            <Suspense fallback={<div className="panel dim">tuning in…</div>}>
+              <SpotifyView />
+            </Suspense>
+          )}
+          {module === 'stats' && <StatsView />}
+        </div>
       )}
-      {module === 'stats' && <StatsView />}
       <ToastHost />
-    </div>
+    </>
   )
 }

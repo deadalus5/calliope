@@ -11,6 +11,8 @@ import {
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker, type TrackedPitch } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
+import { reportMicFailure } from '../../pitch/mic-errors'
+import { useAppPrefs } from '../../state/app-prefs'
 import './sing.css'
 
 /**
@@ -29,6 +31,14 @@ export function SingView() {
   const [droneOn, setDroneOn] = useState(false)
   const [live, setLive] = useState<TrackedPitch | null>(null)
   const [debug, setDebug] = useState(false)
+  const micMode = useAppPrefs((s) => s.micMode)
+
+  // Global mic-off flips while listening: the engine already died
+  // (MicToggle stops it), so drop out of "mic on" rather than showing a
+  // stuck "listening" state.
+  useEffect(() => {
+    if (micMode === 'off' && micOn) setMicOn(false)
+  }, [micMode, micOn])
 
   useEffect(() => {
     if (!micOn) return
@@ -39,8 +49,11 @@ export function SingView() {
         if (cancelled) return
         await calibrateNoiseFloor(0.8)
         noteTracker.start()
-      } catch {
-        if (!cancelled) setMicOn(false)
+      } catch (err) {
+        if (!cancelled) {
+          reportMicFailure(err)
+          setMicOn(false) // keep the revert — UI must not claim mic-on on failure
+        }
       }
     })()
     let silenceTimer: ReturnType<typeof setTimeout> | null = null
@@ -113,8 +126,13 @@ export function SingView() {
           >
             {droneOn ? 'drone on' : 'drone off'}
           </button>
-          <button className={micOn ? 'active' : 'primary'} onClick={() => setMicOn(!micOn)}>
-            {micOn ? 'mic listening…' : 'start the mic'}
+          <button
+            className={micOn ? 'active' : 'primary'}
+            disabled={micMode === 'off'}
+            title={micMode === 'off' ? 'mic is off — flip it on in the board options above' : undefined}
+            onClick={() => setMicOn(!micOn)}
+          >
+            {micMode === 'off' ? 'no mic (see board options)' : micOn ? 'mic listening…' : 'start the mic'}
           </button>
           <button className={debug ? 'active' : ''} onClick={() => setDebug(!debug)}>
             tuner panel
