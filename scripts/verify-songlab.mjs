@@ -21,6 +21,13 @@ async function fail(msg) {
   process.exit(1)
 }
 
+// Task 12: count-in now defaults on, so a bare click-play would start the
+// music ~1 bar later than this script's grid/peak checks expect. Seed the
+// pref off before any app code runs rather than padding the polling budget.
+await page.addInitScript(() => {
+  localStorage.setItem('calliope:app-prefs', JSON.stringify({ state: { micMode: 'on', countIn: false }, version: 0 }))
+})
+
 await page.goto('http://127.0.0.1:5173')
 await page.click('button:has-text("Pick up the guitar")')
 await page.click('button:has-text("Song Lab")')

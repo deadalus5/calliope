@@ -26,8 +26,11 @@ export interface Mixer {
   ready: Promise<void>
   /** Current master peak in dBFS (Tone.Meter after the limiter). */
   peakDb(): number
-  /** Set each channel's volume to its BASE_CHANNEL_DB + (trims[id] ?? 0). */
+  /** Set each channel's volume to its BASE_CHANNEL_DB + (trims[id] ?? 0) + userGain(id). */
   applyTrims(trims?: Partial<Record<MixChannelId, number>>): void
+  /** Practice-mode user trim (clamped [-24, +6] dB), on top of BASE + style trim. Survives applyTrims. */
+  setUserGain(id: MixChannelId, db: number): void
+  userGain(id: MixChannelId): number
 }
 
 let mixer: Mixer | null = null
@@ -108,10 +111,28 @@ export function getMixer(): Mixer {
     return btoa(binary)
   }
 
+  // Practice-mode user trims (Task 12): a third layer on top of BASE +
+  // style trim, set from MixerStrip and never touched by applyTrims —
+  // recompose() is the one place all three layers combine.
+  const userGains: Record<MixChannelId, number> = { keys: 0, bass: 0, drums: 0 }
+  let currentTrims: Partial<Record<MixChannelId, number>> = {}
+
+  function recompose(id: MixChannelId): void {
+    channels[id].volume.value = BASE_CHANNEL_DB[id] + (currentTrims[id] ?? 0) + userGains[id]
+  }
+
   function applyTrims(trims?: Partial<Record<MixChannelId, number>>): void {
-    for (const id of Object.keys(channels) as MixChannelId[]) {
-      channels[id].volume.value = BASE_CHANNEL_DB[id] + (trims?.[id] ?? 0)
-    }
+    currentTrims = trims ?? {}
+    for (const id of Object.keys(channels) as MixChannelId[]) recompose(id)
+  }
+
+  function setUserGain(id: MixChannelId, db: number): void {
+    userGains[id] = Math.min(6, Math.max(-24, db))
+    recompose(id)
+  }
+
+  function userGain(id: MixChannelId): number {
+    return userGains[id]
   }
 
   mixer = {
@@ -121,6 +142,8 @@ export function getMixer(): Mixer {
     ready: reverb.ready,
     peakDb,
     applyTrims,
+    setUserGain,
+    userGain,
   }
 
   // Expose for E2E.

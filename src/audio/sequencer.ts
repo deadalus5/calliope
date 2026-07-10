@@ -62,6 +62,7 @@ export class SequencerEngine {
   private chordListeners = new Set<ChordListener>()
   private beatListeners = new Set<BeatListener>()
   private timeline: TimelineEvent[] = []
+  private bakedBars = 0
   progression: Progression | null = null
   key: PitchClass = 0
   bars = 0
@@ -72,6 +73,7 @@ export class SequencerEngine {
     this.key = key
     this.timeline = buildTimeline(progression, key)
     this.bars = totalBars(progression)
+    this.bakedBars = this.bars * PASSES
     const beatsPerBar = progression.timeSignature[0]
     const style = styleFor(progression)
     const t = Tone.getTransport()
@@ -80,7 +82,7 @@ export class SequencerEngine {
     t.swing = style.swing
     t.swingSubdivision = '8n'
     t.loop = true
-    t.setLoopPoints('0:0:0', `${this.bars * PASSES}:0:0`)
+    t.setLoopPoints('0:0:0', `${this.bakedBars}:0:0`)
 
     getMixer().applyTrims(style.trims)
 
@@ -206,6 +208,7 @@ export class SequencerEngine {
 
     exposeDebug({
       chordEvents: debugChordEvents,
+      loop: null,
       songDebug: {
         progressionId: progression.id,
         bpm: t.bpm.value,
@@ -246,11 +249,33 @@ export class SequencerEngine {
 
   get playing(): boolean { return Tone.getTransport().state === 'started' }
 
+  /** True at the very start of the transport — mirrors the condition play() uses to decide on a count-in. */
+  get atStart(): boolean { return Tone.getTransport().seconds === 0 }
+
+  /** Current transport position folded into form-space bars (0..bars-1), for A/B loop bookkeeping. */
+  get positionBar(): number {
+    if (this.bars <= 0) return 0
+    const bars = parseInt(String(Tone.getTransport().position).split(':')[0], 10) || 0
+    return ((bars % this.bars) + this.bars) % this.bars
+  }
+
   setTempo(bpm: number): void { Tone.getTransport().bpm.value = bpm }
   get tempo(): number { return Math.round(Tone.getTransport().bpm.value) }
 
+  /** Jump the transport to the start of `bar` (form-space); works playing or paused. */
+  seek(bar: number): void {
+    Tone.getTransport().position = `${bar}:0:0`
+  }
+
   setLoop(startBar: number, endBar: number): void {
     Tone.getTransport().setLoopPoints(`${startBar}:0:0`, `${endBar}:0:0`)
+    exposeDebug({ loop: { a: startBar, b: endBar } })
+  }
+
+  /** Restore the loop points to the full baked range (0..bars*PASSES), clearing any A/B selection. */
+  clearLoop(): void {
+    Tone.getTransport().setLoopPoints('0:0:0', `${this.bakedBars}:0:0`)
+    exposeDebug({ loop: null })
   }
 
   /** Current timeline (for chart rendering). */

@@ -16,13 +16,32 @@
   align-items: center;
   justify-content: center;
   background: #101014;
+  cursor: pointer;
   transition: background 100ms ease, border-color 100ms ease;
 }
+
+.chart-bar:hover { border-color: var(--brass); }
 
 .chart-bar.active {
   background: var(--gold);
   border-color: var(--gold);
   box-shadow: 0 0 18px rgba(236, 201, 120, 0.35);
+}
+
+.chart-bar.looped {
+  border-color: var(--ember);
+  box-shadow: inset 0 0 0 1px var(--ember);
+}
+
+.chart-bar.loop-pending {
+  border-color: var(--ember);
+  border-style: dashed;
+}
+
+.loop-hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin: -6px 0 10px;
 }
 
 .chart-chord {
@@ -66,4 +85,12 @@
 input[type='range'] {
   accent-color: var(--gold);
   width: 140px;
+}
+
+.songlab-countin {
+  cursor: pointer;
+  user-select: none;
+}
+.songlab-countin input[type='checkbox'] {
+  accent-color: var(--gold);
 }
