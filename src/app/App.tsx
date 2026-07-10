@@ -3,20 +3,29 @@ import { startAudio } from '../audio/context'
 import { ExploreView } from './views/ExploreView'
 import { SingView } from './views/SingView'
 import { SongLabView } from './views/SongLabView'
+import { EarGymView } from './views/EarGymView'
+import { TriadAtlasView } from './views/TriadAtlasView'
+import { ModalColorsView } from './views/ModalColorsView'
+import { StatsView } from './views/StatsView'
 import './tokens.css'
 import './app.css'
 
 /**
- * Shell: start gate (browsers need a gesture before audio), then module
- * navigation. Modules register here as they land in later phases.
+ * Shell: start gate (browsers need a gesture before audio), then modules.
+ * Views own their audio/mic lifecycles and stop them on unmount, so
+ * switching modules always lands in a quiet room.
  */
 
-type ModuleId = 'explore' | 'sing' | 'songlab'
+type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'modes' | 'songlab' | 'stats'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
   { id: 'sing', label: 'Name What You Sing' },
+  { id: 'eargym', label: 'Ear Gym' },
+  { id: 'triads', label: 'Triad Atlas' },
+  { id: 'modes', label: 'Modal Colors' },
   { id: 'songlab', label: 'Song Lab' },
+  { id: 'stats', label: 'Dark Spots' },
 ]
 
 export default function App() {
@@ -65,7 +74,11 @@ export default function App() {
 
       {module === 'explore' && <ExploreView />}
       {module === 'sing' && <SingView />}
+      {module === 'eargym' && <EarGymView />}
+      {module === 'triads' && <TriadAtlasView />}
+      {module === 'modes' && <ModalColorsView />}
       {module === 'songlab' && <SongLabView />}
+      {module === 'stats' && <StatsView />}
     </div>
   )
 }

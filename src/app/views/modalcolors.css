@@ -1,0 +1,29 @@
+.mode-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.mode-card.active {
+  border-color: var(--blue);
+  background: #14303d;
+}
+
+.mode-card-name { font-weight: 600; font-size: 14px; }
+.mode-card.active .mode-card-name { color: var(--blue); }
+.mode-card-formula { font-size: 11px; color: var(--ink-dim); }
+.mode-card-songs { font-size: 11px; color: var(--ink-faint); font-style: italic; }
+
+@media (max-width: 1100px) {
+  .mode-cards { grid-template-columns: repeat(3, 1fr); }
+}

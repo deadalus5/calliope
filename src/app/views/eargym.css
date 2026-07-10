@@ -1,0 +1,25 @@
+.gym-status {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  min-height: 56px;
+  padding: 8px 4px 14px;
+}
+
+.gym-phase {
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: var(--ink);
+  transition: color 150ms ease;
+}
+
+.gym-listen .gym-phase { color: var(--blue); }
+.gym-hit .gym-phase { color: var(--good); }
+.gym-miss .gym-phase { color: var(--bad); }
+.gym-timeout .gym-phase { color: var(--ink-dim); }
+
+.gym-heard { color: var(--bad); font-size: 15px; }
+
+.gym-score { margin-left: auto; font-size: 15px; color: var(--ink-dim); }
+.gym-score .good { color: var(--good); font-size: 18px; }
+.gym-streak { color: var(--gold); margin-left: 8px; }

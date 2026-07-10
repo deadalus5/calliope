@@ -34,10 +34,14 @@ export function SingView() {
     if (!micOn) return
     let cancelled = false
     ;(async () => {
-      await startPitchEngine()
-      if (cancelled) return
-      await calibrateNoiseFloor(0.8)
-      noteTracker.start()
+      try {
+        await startPitchEngine()
+        if (cancelled) return
+        await calibrateNoiseFloor(0.8)
+        noteTracker.start()
+      } catch {
+        if (!cancelled) setMicOn(false)
+      }
     })()
     let silenceTimer: ReturnType<typeof setTimeout> | null = null
     const unsub = noteTracker.on((e) => {
