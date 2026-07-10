@@ -15,6 +15,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 92,
     timeSignature: [4, 4],
     feel: 'shuffle',
+    styleId: 'blues-shuffle',
     scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
     description: 'The home form. Minor pentatonic over dominant chords is the blues sound itself.',
     steps: [
@@ -31,6 +32,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 100,
     timeSignature: [4, 4],
     feel: 'shuffle',
+    styleId: 'blues-shuffle',
     scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
     description: 'Same form, IV chord in bar 2 — hear the early lift.',
     steps: [
@@ -47,6 +49,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 80,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'slow-minor-blues',
     scaleHint: { modeId: 'aeolian', rootOffset: 0 },
     description: 'The Thrill Is Gone territory. Watch the b6 color on the bVI chord.',
     steps: [
@@ -64,6 +67,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 118,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'dead-drive',
     scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
     description: 'THE Mixolydian teacher: A–G–D. The G chord IS the b7 color note as a whole chord.',
     steps: [
@@ -79,6 +83,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 104,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'dead-drive',
     scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
     description: 'Two chords, one mode: B to A forever. Pure I–bVII Mixolydian vamp.',
     steps: [
@@ -93,6 +98,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 110,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'dead-drive',
     scaleHint: { modeId: 'mixolydian', rootOffset: 0 },
     description: 'B–A–E: Mixolydian with the IV giving it that skipping major bounce.',
     steps: [
@@ -108,6 +114,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 96,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'dead-drive',
     scaleHint: { modeId: 'ionian', rootOffset: 0 },
     description: 'A lazy I–IV vamp — major pentatonic home, Ionian colors on top.',
     steps: [
@@ -122,6 +129,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 78,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'slow-soul',
     scaleHint: { modeId: 'aeolian', rootOffset: 0 },
     description: 'C#m–A–E–B: the slow-burn minor lament. Triad targets on every change.',
     steps: [
@@ -137,6 +145,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 62,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'slow-soul',
     scaleHint: { modeId: 'ionian', rootOffset: 0 },
     description: 'G to C/G — two chords, infinite space. Major pentatonic with Ionian color notes.',
     steps: [
@@ -151,6 +160,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 86,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'pop-soul',
     scaleHint: { modeId: 'ionian', rootOffset: 0 },
     description: 'D–Bm–G–D / A–Bm–G–D: classic soul changes; find the shared tones between triads.',
     steps: [
@@ -167,6 +177,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 112,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'hypnotic-vamp',
     scaleHint: { modeId: 'dorian', rootOffset: 0 },
     description: 'Am7–D9 forever. The D9 contains the natural 6 (F#) — Dorian as a chord.',
     steps: [
@@ -180,6 +191,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 72,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'neo-soul',
     scaleHint: { modeId: 'dorian', rootOffset: 0 },
     description: 'Dm9–G13–Cmaj9–A7#9 style motion — upper-structure triads everywhere.',
     steps: [
@@ -194,6 +206,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 70,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'hypnotic-vamp',
     scaleHint: { modeId: 'lydian', rootOffset: 0 },
     description: 'Cmaj7–D/C: the D triad over C bass IS the #4 color. Slash chord = mode.',
     steps: [
@@ -207,6 +220,7 @@ export const PROGRESSIONS: Progression[] = [
     defaultTempo: 96,
     timeSignature: [4, 4],
     feel: 'straight',
+    styleId: 'hypnotic-vamp',
     scaleHint: { modeId: 'phrygian', rootOffset: 0 },
     description: 'Em–F/E: the F triad a half-step up is the b2 color as a chord.',
     steps: [

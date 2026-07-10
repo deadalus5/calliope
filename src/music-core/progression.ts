@@ -30,6 +30,8 @@ export interface Progression {
   scaleHint: ScaleHint
   feel: 'straight' | 'shuffle'
   description: string
+  /** Arrangement style key, resolved in src/audio/styles.ts — music-core stays agnostic. */
+  styleId?: string
 }
 
 export interface TimelineEvent {
