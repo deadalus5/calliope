@@ -9,6 +9,7 @@ import { SlashGuideView } from './views/SlashGuideView'
 import { ModalColorsView } from './views/ModalColorsView'
 import { StatsView } from './views/StatsView'
 import { BoardOptions } from '../fretboard/BoardOptions'
+import { ToastHost } from './components/Toast'
 import './tokens.css'
 import './app.css'
 
@@ -56,31 +57,34 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="start-gate">
-        <h1>Calliope</h1>
-        <p>
-          Music theory built on the map you already own — the pentatonic shapes,
-          the E and A anchors, and your ear.
-        </p>
-        <button
-          className="primary"
-          disabled={loading}
-          onClick={async () => {
-            setLoading(true)
-            await startAudio()
-            // decode every sample before the first note can be asked for
-            const [{ warmAudition }, { getBand, bandReady }, { samplesLoaded }] = await Promise.all([
-              import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
-            ])
-            warmAudition()
-            getBand()
-            await Promise.all([samplesLoaded(), bandReady()])
-            setReady(true)
-          }}
-        >
-          {loading ? 'tuning up…' : 'Pick up the guitar'}
-        </button>
-      </div>
+      <>
+        <div className="start-gate">
+          <h1>Calliope</h1>
+          <p>
+            Music theory built on the map you already own — the pentatonic shapes,
+            the E and A anchors, and your ear.
+          </p>
+          <button
+            className="primary"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true)
+              await startAudio()
+              // decode every sample before the first note can be asked for
+              const [{ warmAudition }, { getBand, bandReady }, { samplesLoaded }] = await Promise.all([
+                import('../audio/audition'), import('../audio/instruments'), import('../audio/samples'),
+              ])
+              warmAudition()
+              getBand()
+              await Promise.all([samplesLoaded(), bandReady()])
+              setReady(true)
+            }}
+          >
+            {loading ? 'tuning up…' : 'Pick up the guitar'}
+          </button>
+        </div>
+        <ToastHost />
+      </>
     )
   }
 
@@ -118,6 +122,7 @@ export default function App() {
         </Suspense>
       )}
       {module === 'stats' && <StatsView />}
+      <ToastHost />
     </div>
   )
 }

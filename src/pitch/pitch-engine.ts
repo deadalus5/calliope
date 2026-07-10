@@ -1,4 +1,5 @@
 import { getRawContext } from '../audio/context'
+import { useAppPrefs } from '../state/app-prefs'
 
 /**
  * Mic → AudioWorklet lifecycle. Echo cancellation, noise suppression and
@@ -16,6 +17,12 @@ export interface PitchFrame {
 
 export type PitchListener = (frame: PitchFrame) => void
 
+export class MicDisabledError extends Error {
+  constructor() {
+    super('Microphone is disabled (no-mic mode)')
+  }
+}
+
 let stream: MediaStream | null = null
 let node: AudioWorkletNode | null = null
 let source: MediaStreamAudioSourceNode | null = null
@@ -26,6 +33,12 @@ const listeners = new Set<PitchListener>()
 export let frameCount = 0
 
 export async function startPitchEngine(): Promise<void> {
+  // Guard goes BEFORE the idempotency check below: an already-running
+  // engine implies micMode was 'on' when it started, but we still want
+  // no-mic mode to always refuse a fresh start call. Task 11's mic-toggle
+  // handler is responsible for calling stopPitchEngine() when flipping to
+  // 'off' while the engine is already running.
+  if (useAppPrefs.getState().micMode === 'off') throw new MicDisabledError()
   if (node) return
   const ctx = getRawContext()
   if (!workletLoaded) {
