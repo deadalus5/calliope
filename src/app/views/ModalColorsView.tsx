@@ -12,7 +12,7 @@ import {
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
-import { reportMicFailure } from '../../pitch/mic-errors'
+import { reportMicFailure } from '../mic-errors'
 import { usePitchRound } from '../../drills/engine/use-pitch-round'
 import { recordAttempt } from '../../state/db'
 import { useAppPrefs } from '../../state/app-prefs'

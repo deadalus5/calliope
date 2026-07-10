@@ -1,5 +1,4 @@
 import { getRawContext } from '../audio/context'
-import { useAppPrefs } from '../state/app-prefs'
 
 /**
  * Mic → AudioWorklet lifecycle. Echo cancellation, noise suppression and
@@ -28,17 +27,28 @@ let node: AudioWorkletNode | null = null
 let source: MediaStreamAudioSourceNode | null = null
 let sink: GainNode | null = null
 let workletLoaded = false
+let micDisabled = false
 const listeners = new Set<PitchListener>()
 /** Debug probe: total frames received (visible in devtools). */
 export let frameCount = 0
 
+/**
+ * No-mic gate, synced from the app layer (App.tsx watches the micMode pref
+ * and calls this, including once at startup so a persisted 'off' takes
+ * effect before any view acts). A plain flag keeps pitch/ free of store
+ * imports per the layering rules — pitch/ depends only on music-core.
+ */
+export function setMicDisabled(disabled: boolean): void {
+  micDisabled = disabled
+}
+
 export async function startPitchEngine(): Promise<void> {
   // Guard goes BEFORE the idempotency check below: an already-running
-  // engine implies micMode was 'on' when it started, but we still want
-  // no-mic mode to always refuse a fresh start call. Task 11's mic-toggle
+  // engine implies the mic was enabled when it started, but we still want
+  // no-mic mode to always refuse a fresh start call. The mic-toggle
   // handler is responsible for calling stopPitchEngine() when flipping to
   // 'off' while the engine is already running.
-  if (useAppPrefs.getState().micMode === 'off') throw new MicDisabledError()
+  if (micDisabled) throw new MicDisabledError()
   if (node) return
   const ctx = getRawContext()
   if (!workletLoaded) {

@@ -11,6 +11,8 @@ import { StatsView } from './views/StatsView'
 import { BoardOptions } from '../fretboard/BoardOptions'
 import { MicToggle } from './components/MicToggle'
 import { ToastHost } from './components/Toast'
+import { setMicDisabled } from '../pitch/pitch-engine'
+import { useAppPrefs } from '../state/app-prefs'
 import './tokens.css'
 import './app.css'
 
@@ -44,6 +46,14 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [module, setModule] = useState<ModuleId>('explore')
+  const micMode = useAppPrefs((s) => s.micMode)
+
+  // Sync the micMode pref into pitch-engine's plain no-mic flag (pitch/
+  // can't import state/, per the layering rules). Runs on first mount too,
+  // so a persisted 'off' takes effect before any view can start the mic.
+  useEffect(() => {
+    setMicDisabled(micMode === 'off')
+  }, [micMode])
 
   // Returning from Spotify OAuth lands on /callback: finish the token
   // exchange, then open the Jam Room after the start gate.

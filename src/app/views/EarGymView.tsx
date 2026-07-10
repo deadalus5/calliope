@@ -13,7 +13,7 @@ import {
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
-import { reportMicFailure } from '../../pitch/mic-errors'
+import { reportMicFailure } from '../mic-errors'
 import { usePitchRound } from '../../drills/engine/use-pitch-round'
 import { loadCells, recordAttempt } from '../../state/db'
 import { sampleCell } from '../../state/skill-model'
@@ -57,8 +57,14 @@ export function EarGymView() {
   const [target, setTarget] = useState<Degree | null>(null)
   const [reveal, setReveal] = useState(false)
   const [stats, setStats] = useState({ hits: 0, misses: 0, streak: 0, lastLatMs: 0 })
+  const [starting, setStarting] = useState(false)
   const micMode = useAppPrefs((s) => s.micMode)
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guards for begin()'s async mic grab: startingRef blocks a double-click
+  // double-getUserMedia race; disposedRef cancels post-await work after
+  // unmount (mirrors the old mount-effect's `cancelled` pattern).
+  const startingRef = useRef(false)
+  const disposedRef = useRef(false)
 
   const round = usePitchRound({
     onScored: (r) => {
@@ -88,20 +94,30 @@ export function EarGymView() {
 
   // Opening the view never grabs the mic — that only happens on "begin",
   // and only when micMode is 'on'. Unmount still tears everything down.
-  useEffect(() => () => {
-    noteTracker.stop()
-    stopPitchEngine()
-    stopDrone()
-    if (nextTimer.current) clearTimeout(nextTimer.current)
+  // disposedRef is reset in the effect body (not just set in cleanup) so
+  // StrictMode's dev-time mount->cleanup->mount cycle doesn't leave it
+  // stuck true on the surviving instance.
+  useEffect(() => {
+    disposedRef.current = false
+    return () => {
+      disposedRef.current = true
+      noteTracker.stop()
+      stopPitchEngine()
+      stopDrone()
+      if (nextTimer.current) clearTimeout(nextTimer.current)
+    }
   }, [])
 
-  // Sing needs the mic; if the pref flips off mid-session, fall back to
-  // find rather than leaving an un-scoreable mode selected.
+  // A session must run start-to-finish on one input path: a no-mic round
+  // has no engine to score with, and a mic round loses tap answering. If
+  // the global pref flips EITHER direction mid-session, end it cleanly and
+  // let him restart on the right path — end() -> round.toIdle() clears the
+  // round timer and listener before they can fire, so the aborted round
+  // logs nothing (no spurious miss into the EWMA). Sing additionally falls
+  // back to find when the mic goes away.
   useEffect(() => {
-    if (micMode === 'off' && mode === 'sing') {
-      setMode('find')
-      if (running) end()
-    }
+    if (micMode === 'off' && mode === 'sing') setMode('find')
+    if (running) end()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micMode])
 
@@ -147,15 +163,27 @@ export function EarGymView() {
 
   const begin = useCallback(async () => {
     if (micMode === 'on') {
+      if (startingRef.current) return // mic grab already in flight
+      startingRef.current = true
+      setStarting(true)
+      // Cancelled if the view unmounted or the pref flipped off while a
+      // mic promise was pending; stop whatever we started.
+      const cancelled = () => disposedRef.current || useAppPrefs.getState().micMode !== 'on'
       try {
         await startPitchEngine()
+        if (cancelled()) { stopPitchEngine(); return }
         await calibrateNoiseFloor(0.8)
+        if (cancelled()) { stopPitchEngine(); return }
         noteTracker.start()
       } catch (err) {
-        reportMicFailure(err)
+        if (!disposedRef.current) reportMicFailure(err)
         return // don't silently pretend the round runs mic-scored
+      } finally {
+        startingRef.current = false
+        if (!disposedRef.current) setStarting(false)
       }
     }
+    if (disposedRef.current) return
     setRunning(true)
     setStats({ hits: 0, misses: 0, streak: 0, lastLatMs: 0 })
     startDrone(key)
@@ -247,7 +275,11 @@ export function EarGymView() {
           </div>
           {running
             ? <button onClick={end}>stop</button>
-            : <button className="primary" onClick={begin}>start</button>}
+            : (
+              <button className="primary" disabled={starting} onClick={begin}>
+                {starting ? 'starting…' : 'start'}
+              </button>
+            )}
         </div>
 
         {noMicFind && (

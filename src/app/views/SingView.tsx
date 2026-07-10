@@ -11,7 +11,7 @@ import {
 import { startPitchEngine, stopPitchEngine } from '../../pitch/pitch-engine'
 import { noteTracker, type TrackedPitch } from '../../pitch/note-tracker'
 import { calibrateNoiseFloor } from '../../pitch/calibration'
-import { reportMicFailure } from '../../pitch/mic-errors'
+import { reportMicFailure } from '../mic-errors'
 import { useAppPrefs } from '../../state/app-prefs'
 import './sing.css'
 
