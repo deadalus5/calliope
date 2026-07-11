@@ -282,16 +282,18 @@ export function SongLabView() {
 
 /** Guide-tone drill HUD: upcoming target, last-result flash, running tally. */
 function GuideToneHud({ state, keyRoot }: { state: ReturnType<typeof useGuideToneDrill>; keyRoot: PitchClass }) {
-  const { upcoming, lastResult, tally } = state
+  const { upcoming, lastResult, tally, loopPaused } = state
   return (
     <div className={`songlab-guidetone-hud${lastResult ? ` flash-${lastResult}` : ''}`}>
-      {upcoming
-        ? (
-          <span>
-            land the <b>{upcoming.targetLabel} of {upcoming.symbol}</b> — {pcName(upcoming.targetPc, keyRoot)}
-          </span>
-          )
-        : <span className="dim">listening for the next change…</span>}
+      {loopPaused
+        ? <span className="dim">guide tones pause while an A/B loop is set</span>
+        : upcoming
+          ? (
+            <span>
+              land the <b>{upcoming.targetLabel} of {upcoming.symbol}</b> — {pcName(upcoming.targetPc, keyRoot)}
+            </span>
+            )
+          : <span className="dim">listening for the next change…</span>}
       <span className="mono songlab-guidetone-tally">
         <b className={lastResult === 'hit' ? 'good' : lastResult === 'miss' ? 'bad' : undefined}>{tally.hits}</b>
         {' / '}{tally.total}

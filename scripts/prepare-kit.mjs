@@ -18,7 +18,6 @@ import {
   statSync,
   rmSync,
   mkdtempSync,
-  readdirSync,
 } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';

@@ -165,16 +165,21 @@ export function EarGymView() {
     const degree = cell.degree
     setTarget(degree)
     const pc = pcOfDegree(degree, key)
+    // No-mic sessions only ever run "find" (sing falls back above), and
+    // their unanswered-timeout attempts must carry detail:'tap' like a
+    // scored tap does — arm() takes the active input mode explicitly
+    // rather than assuming mic.
+    const via = micMode === 'off' ? 'tap' : 'mic'
     if (mode === 'find') {
       playMidi(promptMidi(pc))
       // arm once the prompt note has spoken
-      armTimer.current = setTimeout(() => round.arm(pc), 700)
+      armTimer.current = setTimeout(() => round.arm(pc, via), 700)
     } else {
       // sing mode: name the degree, replay the root as reference
       playMidi(promptMidi(key))
-      armTimer.current = setTimeout(() => round.arm(pc), 900)
+      armTimer.current = setTimeout(() => round.arm(pc, via), 900)
     }
-  }, [round, pool, kind, mode, key])
+  }, [round, pool, kind, mode, key, micMode])
 
   const begin = useCallback(async () => {
     if (micMode === 'on') {

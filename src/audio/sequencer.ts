@@ -63,12 +63,15 @@ export class SequencerEngine {
   private beatListeners = new Set<BeatListener>()
   private timeline: TimelineEvent[] = []
   private bakedBars = 0
+  private loopBounds: { start: number; end: number } | null = null
+  private _generation = 0
   progression: Progression | null = null
   key: PitchClass = 0
   bars = 0
 
   load(progression: Progression, key: PitchClass, tempo?: number): void {
     this.dispose()
+    this._generation++
     this.progression = progression
     this.key = key
     this.timeline = buildTimeline(progression, key)
@@ -83,6 +86,7 @@ export class SequencerEngine {
     t.swingSubdivision = '8n'
     t.loop = true
     t.setLoopPoints('0:0:0', `${this.bakedBars}:0:0`)
+    this.loopBounds = null // full baked range = no A/B loop selected
 
     getMixer().applyTrims(style.trims)
 
@@ -269,14 +273,27 @@ export class SequencerEngine {
 
   setLoop(startBar: number, endBar: number): void {
     Tone.getTransport().setLoopPoints(`${startBar}:0:0`, `${endBar}:0:0`)
+    this.loopBounds = { start: startBar, end: endBar }
     exposeDebug({ loop: { a: startBar, b: endBar } })
   }
 
   /** Restore the loop points to the full baked range (0..bars*PASSES), clearing any A/B selection. */
   clearLoop(): void {
     Tone.getTransport().setLoopPoints('0:0:0', `${this.bakedBars}:0:0`)
+    this.loopBounds = null
     exposeDebug({ loop: null })
   }
+
+  /** True while an A/B loop (narrower than the full baked range) is selected — drills that
+   *  score against "the next chord in form order" must pause while this is true: at a loop
+   *  wrap, the next audible chord is the loop start's, not timeline[index+1]. */
+  get loopActive(): boolean { return this.loopBounds !== null }
+
+  /** Bumped on every load() (song or key change) — a session artifact (like a guide-tone
+   *  drill window) captures this at schedule time and treats a mismatch at close as "abort,
+   *  don't score": the progression object/id can stay identical across a key change, so id
+   *  alone can't detect it. */
+  get generation(): number { return this._generation }
 
   /** Current timeline (for chart rendering). */
   get events(): TimelineEvent[] { return this.timeline }

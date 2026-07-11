@@ -34,6 +34,9 @@ export interface GuideToneState {
   upcoming: { symbol: string; targetPc: PitchClass; targetLabel: string } | null
   lastResult: 'hit' | 'miss' | null
   tally: { hits: number; total: number }
+  /** True while an A/B loop is set — the drill pauses (see module doc) and the HUD should
+   *  say why nothing is being asked. */
+  loopPaused: boolean
   toggle(): void
 }
 
@@ -42,6 +45,7 @@ interface LiveWindow {
   tNext: number // audio-clock time the next chord actually sounds
   matched: boolean
   progId: string | undefined
+  generation: number
   closeTimer: ReturnType<typeof setTimeout>
   lockUnsub: () => void
 }
@@ -51,6 +55,7 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
   const [upcoming, setUpcoming] = useState<GuideToneState['upcoming']>(null)
   const [lastResult, setLastResult] = useState<'hit' | 'miss' | null>(null)
   const [tally, setTally] = useState({ hits: 0, total: 0 })
+  const [loopPaused, setLoopPaused] = useState(false)
   const micMode = useAppPrefs((s) => s.micMode)
 
   // `key` can change while the drill is live (song/key pickers stay live in
@@ -93,7 +98,14 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
    *  Song Lab pause/stop mid-window would otherwise let the close fire
    *  against a silent band (or, after pause-then-resume, out of sync with
    *  the delayed chord change) and log a miss he never had a chance to
-   *  answer. A paused-through window is simply abandoned, unscored. */
+   *  answer. A paused-through window is simply abandoned, unscored.
+   *
+   *  Also abort-not-score if an A/B loop is active (a seek/loop always
+   *  accompanies this in Song Lab, and the window's wall-clock close is
+   *  otherwise decoupled from the reposition) or if the sequencer's load
+   *  generation has moved on since the window opened (a key change reloads
+   *  with the SAME progression object/id, so id equality alone can't catch
+   *  it — the target pitch class was computed against the old key). */
   const closeLiveWindow = useCallback((score: boolean) => {
     const win = liveWindowRef.current
     if (!win) return
@@ -102,7 +114,10 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     liveWindowRef.current = null
     unduckBacking(audioNow())
     exposeDebug({ guideTone: { targetPc: win.targetPc, windowOpen: false } })
-    if (score && !win.matched && sequencer.playing && win.progId === sequencer.progression?.id) {
+    if (
+      score && !win.matched && sequencer.playing && !sequencer.loopActive
+      && win.progId === sequencer.progression?.id && win.generation === sequencer.generation
+    ) {
       void recordAttempt({
         ts: Date.now(), drill: 'chordtone', degree: degreeOf(win.targetPc, keyRef.current), key: keyRef.current,
         correct: false, latencyMs: 0, detail: 'guide',
@@ -112,13 +127,18 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     }
   }, [])
 
-  const handleWindowOpen = useCallback((targetPc: PitchClass, tNext: number, windowCloseAt: number, progId: string | undefined) => {
+  const handleWindowOpen = useCallback((
+    targetPc: PitchClass, tNext: number, windowCloseAt: number, progId: string | undefined, generation: number,
+  ) => {
     openTimerRef.current = null
     // The drill may have been switched off, or the song swapped underneath
     // this pending window, while it was in flight — skip silently: no duck,
-    // no attempt, no stale live-window state left behind.
+    // no attempt, no stale live-window state left behind. Same for a loop
+    // that came in (or a key change bumping the generation) while this
+    // window was pending its open delay.
     if (!activeRef.current) return
     if (!sequencer.playing || sequencer.progression?.id !== progId) return
+    if (sequencer.loopActive || generation !== sequencer.generation) return
     // Defensive only: given the >=1-bar chord-duration invariant this
     // shouldn't happen, but never leave two windows' duck/listener state
     // stacked if it does. Superseded window = aborted, not scored.
@@ -140,7 +160,7 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     // The natural close is the ONLY scoring close (score: true) — and even
     // it re-checks playing/progId inside closeLiveWindow at fire time.
     const closeTimer = setTimeout(() => closeLiveWindow(true), Math.max(0, (windowCloseAt - audioNow()) * 1000))
-    liveWindowRef.current = { targetPc, tNext, matched: false, progId, closeTimer, lockUnsub }
+    liveWindowRef.current = { targetPc, tNext, matched: false, progId, generation, closeTimer, lockUnsub }
     duckBacking(audioNow())
     exposeDebug({ guideTone: { targetPc, windowOpen: true } })
   }, [closeLiveWindow])
@@ -150,6 +170,19 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     // previous one (stale windows die) — the already-open live window (if
     // any) is untouched here; it owns its own close timer.
     clearOpenSchedule()
+    // Guard against the Task 15 review bug: at an A/B loop wrap, the next
+    // audible chord is the LOOP START's, not timeline[index+1] — rather than
+    // special-casing loop math, the drill simply pauses (no new windows)
+    // while a loop is set, and drops anything already pending. Polling here
+    // (every chord change) is enough per the Task 16 review: the window
+    // this guards against never spans more than one chord change anyway.
+    if (sequencer.loopActive) {
+      if (liveWindowRef.current) closeLiveWindow(false)
+      setUpcoming(null)
+      setLoopPaused(true)
+      return
+    }
+    setLoopPaused(false)
     const timeline = sequencer.events
     if (timeline.length === 0) return
     const nextEvent = timeline[(e.index + 1) % timeline.length]
@@ -168,12 +201,13 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     const windowOpenAt = tNext - beatSec
     const windowCloseAt = tNext + beatSec
     const progId = sequencer.progression?.id
+    const generation = sequencer.generation
     const openDelayMs = Math.max(0, (windowOpenAt - audioNow()) * 1000)
     openTimerRef.current = setTimeout(
-      () => handleWindowOpen(targetPc, tNext, windowCloseAt, progId),
+      () => handleWindowOpen(targetPc, tNext, windowCloseAt, progId, generation),
       openDelayMs,
     )
-  }, [clearOpenSchedule, handleWindowOpen])
+  }, [clearOpenSchedule, handleWindowOpen, closeLiveWindow])
 
   const teardown = useCallback(() => {
     chordUnsubRef.current?.()
@@ -188,6 +222,7 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     setActive(false)
     setUpcoming(null)
     setLastResult(null)
+    setLoopPaused(false)
     exposeDebug({ guideTone: { targetPc: null, windowOpen: false } })
   }, [clearOpenSchedule, closeLiveWindow])
 
@@ -213,6 +248,7 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     setTally({ hits: 0, total: 0 })
     setLastResult(null)
     setUpcoming(null)
+    setLoopPaused(false)
     activeRef.current = true
     setActive(true)
     chordUnsubRef.current = sequencer.onChordChange(onChordChange)
@@ -253,5 +289,5 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micMode])
 
-  return { active, upcoming, lastResult, tally, toggle }
+  return { active, upcoming, lastResult, tally, loopPaused, toggle }
 }

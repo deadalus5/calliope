@@ -118,7 +118,17 @@ export function getMixer(): Mixer {
   let currentTrims: Partial<Record<MixChannelId, number>> = {}
 
   function recompose(id: MixChannelId): void {
-    channels[id].volume.value = BASE_CHANNEL_DB[id] + (currentTrims[id] ?? 0) + userGains[id]
+    // Tone.Channel/Volume derives `mute` from `volume.value === -Infinity`
+    // (see Tone's Volume component) — writing volume.value directly while
+    // muted silently un-mutes the channel even though React's MixerStrip
+    // state still shows M active. Capture the mute flag first and
+    // re-assert it after recomposing so a muted channel stays muted (and
+    // Tone's internal `_unmutedVolume` picks up the freshly composed value,
+    // so a later unmute restores to the right level, not a stale one).
+    const ch = channels[id]
+    const wasMuted = ch.mute
+    ch.volume.value = BASE_CHANNEL_DB[id] + (currentTrims[id] ?? 0) + userGains[id]
+    if (wasMuted) ch.mute = true
   }
 
   function applyTrims(trims?: Partial<Record<MixChannelId, number>>): void {

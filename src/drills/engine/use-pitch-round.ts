@@ -38,6 +38,11 @@ export function usePitchRound({ timeoutMs = 9000, huntUntilCorrect = true, onSco
   const scored = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const unsub = useRef<(() => void) | null>(null)
+  // The round's active input mode, set by arm()'s caller — the unanswered
+  // timeout path used to hardcode 'mic', so a no-mic ("tap") round that
+  // timed out logged an attempt with no detail:'tap', indistinguishable
+  // from mic-mode data in the skill model.
+  const viaRef = useRef<'mic' | 'tap'>('mic')
 
   // Callbacks live in refs so arm() stays stable across renders.
   const onScoredRef = useRef(onScored)
@@ -79,11 +84,15 @@ export function usePitchRound({ timeoutMs = 9000, huntUntilCorrect = true, onSco
     }
   }, [clear, huntUntilCorrect])
 
-  /** Enter listening: called once the prompt has finished sounding. */
-  const arm = useCallback((targetPc: PitchClass) => {
+  /** Enter listening: called once the prompt has finished sounding.
+   *  `via` names the round's active input mode (mic-mode listens for a
+   *  lock; no-mic mode expects a fretboard tap via `answer()`) — an
+   *  unanswered timeout logs with this tag rather than assuming 'mic'. */
+  const arm = useCallback((targetPc: PitchClass, via: 'mic' | 'tap' = 'mic') => {
     clear()
     target.current = targetPc
     scored.current = false
+    viaRef.current = via
     setHeard(null)
     setPhase('listen')
     armAt.current = audioNow()
@@ -94,7 +103,7 @@ export function usePitchRound({ timeoutMs = 9000, huntUntilCorrect = true, onSco
     timer.current = setTimeout(() => {
       if (!scored.current) {
         scored.current = true
-        onScoredRef.current({ correct: false, latencyMs: 0, heardPc: null, via: 'mic' })
+        onScoredRef.current({ correct: false, latencyMs: 0, heardPc: null, via: viaRef.current })
       }
       clear()
       setPhase('timeout')
