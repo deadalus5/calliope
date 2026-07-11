@@ -148,6 +148,11 @@ export function useGuideToneDrill(key: PitchClass): GuideToneState {
       if (e.type !== 'lock') return
       const win = liveWindowRef.current
       if (!win || win.matched || e.pitch.pc !== win.targetPc) return // wrong note: keep listening
+      // Mirror of the close path's staleness guard: a lock landing inside an
+      // already-open window after a key change (generation bumped) or a loop
+      // set mid-window must not score a hit — the target was computed
+      // against a schedule that no longer exists (wrong degree otherwise).
+      if (win.generation !== sequencer.generation || sequencer.loopActive || win.progId !== sequencer.progression?.id) return
       win.matched = true
       const latencyMs = Math.max(0, (e.pitch.t - win.tNext) * 1000)
       void recordAttempt({
