@@ -8,7 +8,14 @@
 
 const SCOPES = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state'
 
-export const REDIRECT_URI = 'http://127.0.0.1:5173/callback'
+// Base-relative so this still resolves under a GitHub Pages subpath; in dev
+// (BASE_URL === '/') this stays byte-identical to the old hardcoded
+// 'http://127.0.0.1:5173/callback'. Duplicated as a literal in App.tsx's
+// early pathname check rather than imported from here, so that check never
+// forces a static import of the lazy-loaded spotify chunk.
+const CALLBACK_PATH = import.meta.env.BASE_URL + 'callback'
+
+export const REDIRECT_URI = `${window.location.origin}${CALLBACK_PATH}`
 
 const LS = {
   clientId: 'spotify:clientId',
@@ -70,7 +77,7 @@ async function tokenRequest(body: URLSearchParams): Promise<boolean> {
 
 /** Call on app load: if the URL is the OAuth callback, finish the exchange. */
 export async function handleCallback(): Promise<boolean> {
-  if (window.location.pathname !== '/callback') return false
+  if (window.location.pathname !== CALLBACK_PATH) return false
   const code = new URLSearchParams(window.location.search).get('code')
   const verifier = localStorage.getItem(LS.verifier)
   const clientId = getClientId()
@@ -82,7 +89,7 @@ export async function handleCallback(): Promise<boolean> {
     client_id: clientId,
     code_verifier: verifier,
   }))
-  window.history.replaceState({}, '', '/')
+  window.history.replaceState({}, '', import.meta.env.BASE_URL)
   return ok
 }
 

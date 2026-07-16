@@ -52,7 +52,7 @@ export async function startPitchEngine(): Promise<void> {
   if (node) return
   const ctx = getRawContext()
   if (!workletLoaded) {
-    await ctx.audioWorklet.addModule('/pitch-processor.js')
+    await ctx.audioWorklet.addModule(import.meta.env.BASE_URL + 'pitch-processor.js')
     workletLoaded = true
   }
   stream = await navigator.mediaDevices.getUserMedia({

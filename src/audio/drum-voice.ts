@@ -125,7 +125,7 @@ export class DrumKit {
 
   static async load(id: string): Promise<DrumKit> {
     try {
-      const baseUrl = `/samples/kits/${id}`
+      const baseUrl = `${import.meta.env.BASE_URL}samples/kits/${id}`
       const res = await fetch(`${baseUrl}/kit.json`)
       if (!res.ok) throw new Error(`kit manifest fetch failed: ${res.status} ${res.statusText}`)
       const manifest: KitManifest = await res.json()

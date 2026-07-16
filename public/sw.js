@@ -6,19 +6,26 @@
 //
 // Bump this on any change to the cached shell/strategy — old caches are
 // deleted in `activate`.
-const CACHE_VERSION = 'calliope-v2'
+const CACHE_VERSION = 'calliope-v3'
 const SHELL_CACHE = `${CACHE_VERSION}-shell`
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
 
-// The app shell: small, known-at-build-time files. Hashed Vite bundles
-// (JS/CSS under /assets/) are NOT enumerated here — they're runtime-cached
-// on first fetch instead, so this list never goes stale across a build.
+// Derived at runtime from the SW's own registration scope, not baked in at
+// build time (this file ships byte-for-byte from public/, unbundled) — so
+// the same script works at root ('/') in dev/local-root deploys and under a
+// subpath ('/calliope/') on GitHub Pages.
+const BASE = new URL(self.registration.scope).pathname
+
+// The app shell: small, known-at-build-time files, resolved against BASE.
+// Hashed Vite bundles (JS/CSS under BASE + 'assets/') are NOT enumerated
+// here — they're runtime-cached on first fetch instead, so this list never
+// goes stale across a build.
 const SHELL_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  BASE,
+  `${BASE}index.html`,
+  `${BASE}manifest.webmanifest`,
+  `${BASE}icons/icon-192.png`,
+  `${BASE}icons/icon-512.png`,
 ]
 
 self.addEventListener('install', (event) => {
@@ -64,12 +71,12 @@ self.addEventListener('fetch', (event) => {
   // HARD CONSTRAINT: never touch the Spotify OAuth callback, and never
   // touch cross-origin requests (Spotify's own API/auth calls). Both fall
   // straight through to the network with no respondWith.
-  if (url.pathname === '/callback' || url.origin !== location.origin) return
+  if (url.pathname === `${BASE}callback` || url.origin !== location.origin) return
 
   // Samples and hashed build assets: cache-first, fill the runtime cache
   // on first request. These are content-addressed or effectively static,
   // so a stale cache entry is never wrong.
-  if (url.pathname.startsWith('/samples/') || url.pathname.startsWith('/assets/')) {
+  if (url.pathname.startsWith(`${BASE}samples/`) || url.pathname.startsWith(`${BASE}assets/`)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached
@@ -102,7 +109,7 @@ self.addEventListener('fetch', (event) => {
         caches.match(request).then(async (cached) => {
           if (cached) return cached
           if (request.mode === 'navigate') {
-            const shell = await caches.match('/index.html')
+            const shell = await caches.match(`${BASE}index.html`)
             if (shell) return shell
           }
           // Never resolve respondWith with undefined — hand back a real

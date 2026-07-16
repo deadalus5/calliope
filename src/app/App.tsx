@@ -57,10 +57,13 @@ export default function App() {
     setMicDisabled(micMode === 'off')
   }, [micMode])
 
-  // Returning from Spotify OAuth lands on /callback: finish the token
-  // exchange, then open the Jam Room after the start gate.
+  // Returning from Spotify OAuth lands on /callback (base-relative — see
+  // CALLBACK_PATH in integrations/spotify/auth.ts, duplicated here as a
+  // literal so this module-top string comparison never needs a static
+  // import from the lazy-loaded spotify chunk): finish the token exchange,
+  // then open the Jam Room after the start gate.
   useEffect(() => {
-    if (window.location.pathname === '/callback') {
+    if (window.location.pathname === import.meta.env.BASE_URL + 'callback') {
       void import('../integrations/spotify/auth').then(async ({ handleCallback }) => {
         await handleCallback()
         setModule('jam')

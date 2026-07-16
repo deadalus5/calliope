@@ -14,7 +14,7 @@ createRoot(document.getElementById('root')!).render(
 // that could intercept it. See public/sw.js for the callback early-return.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').catch((err) => {
       console.debug('[sw] registration failed', err)
     })
   })

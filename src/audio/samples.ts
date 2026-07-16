@@ -21,7 +21,7 @@ const BASS_NOTES = ['E1', 'G1', 'As1', 'Cs2', 'E2', 'G2', 'As2', 'Cs3', 'E3']
 export function createPiano(): Tone.Sampler {
   return new Tone.Sampler({
     urls: urls(PIANO_NOTES),
-    baseUrl: '/samples/piano/',
+    baseUrl: import.meta.env.BASE_URL + 'samples/piano/',
     release: 1.2,
     onerror: () => reportLoadError('piano'),
   })
@@ -30,7 +30,7 @@ export function createPiano(): Tone.Sampler {
 export function createGuitar(): Tone.Sampler {
   return new Tone.Sampler({
     urls: urls(GUITAR_NOTES),
-    baseUrl: '/samples/guitar/',
+    baseUrl: import.meta.env.BASE_URL + 'samples/guitar/',
     release: 0.8,
     onerror: () => reportLoadError('guitar'),
   })
@@ -39,7 +39,7 @@ export function createGuitar(): Tone.Sampler {
 export function createBass(): Tone.Sampler {
   return new Tone.Sampler({
     urls: urls(BASS_NOTES),
-    baseUrl: '/samples/bass/',
+    baseUrl: import.meta.env.BASE_URL + 'samples/bass/',
     release: 0.4,
     onerror: () => reportLoadError('bass'),
   })
