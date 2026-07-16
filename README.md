@@ -3,16 +3,25 @@
 Music theory for a guitarist who already plays — built on the map you already
 own: the five pentatonic shapes, the E/A string anchors, and your ear.
 
+**Live site: <https://deadalus5.github.io/calliope/>** — works from anywhere,
+installable as an app (Chrome: install icon in the address bar / *Add to Home
+Screen*), and loads offline after the first visit. Practice data lives in
+each browser — use *export backup* in Dark Spots to move your history between
+machines.
+
 ## Run it
+
+Hosted: just open <https://deadalus5.github.io/calliope/>. Locally:
 
 ```bash
 npm install
 npm run dev        # → http://127.0.0.1:5173
 ```
 
-Open it in **Chrome** on the laptop, guitar in hand. Click *Pick up the
-guitar* (browsers need one gesture before audio), allow the microphone when
-asked, and turn the volume up.
+Open it in **Chrome**, guitar in hand. Click *Pick up the guitar* (browsers
+need one gesture before audio) and turn the volume up. The mic is only
+requested when a drill needs it — and there's a global **no mic** toggle next
+to the board options if you'd rather answer drills by tapping the fretboard.
 
 ## The idea: skeleton + colors
 
@@ -48,6 +57,8 @@ where they're always shown.
 1. Create an app at `developer.spotify.com/dashboard` (any name).
 2. Add exactly `http://127.0.0.1:5173/callback` as a Redirect URI
    (Spotify rejects `localhost`; the dev server is already bound to `127.0.0.1`).
+   To use Jam Room from the hosted site too, also add
+   `https://deadalus5.github.io/calliope/callback`.
 3. Enable the **Web Playback SDK** API, save, copy the **Client ID** into the
    Jam Room setup screen.
 4. Log in (Premium required; Chrome recommended — playback uses DRM).
@@ -58,14 +69,20 @@ change once. Saved locally, follows forever.
 ## Development
 
 ```bash
-npx vitest run                     # music-core, pitch (MPM), skill-model tests
+npx vitest run                     # music-core, arrangers, pitch (MPM), skill-model tests
 npx tsc -p tsconfig.app.json --noEmit
 npx vite build
-node scripts/verify-sing.mjs      # E2E: synthetic voice → pin (needs dev server)
-node scripts/verify-eargym.mjs    # E2E: full drill loop with a fake guitarist
+node scripts/verify-sing.mjs       # E2E: synthetic voice → pin (needs dev server)
+node scripts/verify-eargym.mjs     # E2E: full drill loop with a fake guitarist
+node scripts/verify-songlab.mjs    # E2E: band timing/clipping checks; --bounce records 8 bars
+node scripts/verify-nomic.mjs      # E2E: no-mic mode, tap answers, zero mic requests
+node scripts/verify-guidetone.mjs  # E2E: Song Lab guide-tone drill
 ```
 
 All practice data lives in this browser (IndexedDB + localStorage). No backend.
+
+Deploys are automatic: every push to `main` builds and publishes the live
+site via GitHub Actions (`.github/workflows/deploy.yml`).
 
 ### Layout
 
