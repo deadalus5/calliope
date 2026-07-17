@@ -8,11 +8,14 @@ import { db } from './db'
  */
 
 export interface BackupFile {
-  version: 1
+  version: 1 | 2
   exportedAt: string // ISO
   attempts: unknown[] // db.attempts.toArray()
   cells: unknown[] // db.cells.toArray()
   localStorage: Record<string, string> // ONLY keys starting 'calliope:'
+  /** v2: Jam Room Song Maps + correction overlays (opaque JSON docs). */
+  songmaps?: unknown[]
+  songcorrections?: unknown[]
 }
 
 /** Pure filter: keep only calliope:* entries. Exported so it's unit-testable
@@ -66,13 +69,31 @@ export function validCellRow(row: unknown): boolean {
   )
 }
 
+/** Per-row check for the v2 song-map doc tables (state/db.ts JsonDoc). The
+ * payload stays opaque here; the Spotify module re-validates shape on read
+ * via its own migrate gate, so a stale doc can never crash the app. */
+export function validJsonDocRow(row: unknown): boolean {
+  if (typeof row !== 'object' || row === null) return false
+  const r = row as Record<string, unknown>
+  return (
+    typeof r.trackUri === 'string' && r.trackUri.length > 0 &&
+    isFiniteNumber(r.updatedAt) &&
+    typeof r.data === 'object' && r.data !== null
+  )
+}
+
 export function validateBackup(data: unknown): data is BackupFile {
   if (typeof data !== 'object' || data === null) return false
   const d = data as Record<string, unknown>
-  if (d.version !== 1) return false
+  if (d.version !== 1 && d.version !== 2) return false
   if (typeof d.exportedAt !== 'string') return false
   if (!Array.isArray(d.attempts)) return false
   if (!Array.isArray(d.cells)) return false
+  if (d.version === 2) {
+    if (!Array.isArray(d.songmaps) || !Array.isArray(d.songcorrections)) return false
+    if (!(d.songmaps as unknown[]).every(validJsonDocRow)) return false
+    if (!(d.songcorrections as unknown[]).every(validJsonDocRow)) return false
+  }
   if (typeof d.localStorage !== 'object' || d.localStorage === null || Array.isArray(d.localStorage)) return false
   for (const v of Object.values(d.localStorage as Record<string, unknown>)) {
     if (typeof v !== 'string') return false
@@ -84,7 +105,9 @@ export function validateBackup(data: unknown): data is BackupFile {
 }
 
 export async function collectBackup(): Promise<BackupFile> {
-  const [attempts, cells] = await Promise.all([db.attempts.toArray(), db.cells.toArray()])
+  const [attempts, cells, songmaps, songcorrections] = await Promise.all([
+    db.attempts.toArray(), db.cells.toArray(), db.songmaps.toArray(), db.songcorrections.toArray(),
+  ])
   const entries: [string, string][] = []
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i)
@@ -94,10 +117,12 @@ export async function collectBackup(): Promise<BackupFile> {
     entries.push([key, value])
   }
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     attempts,
     cells,
+    songmaps,
+    songcorrections,
     localStorage: filterCalliopeKeys(entries),
   }
 }
@@ -154,11 +179,17 @@ export function restoreCalliopeKeys(storage: StorageLike, entries: Record<string
  * state.
  */
 export async function applyBackup(b: BackupFile): Promise<void> {
-  await db.transaction('rw', db.attempts, db.cells, async () => {
+  await db.transaction('rw', db.attempts, db.cells, db.songmaps, db.songcorrections, async () => {
     await db.attempts.clear()
     await db.cells.clear()
+    await db.songmaps.clear()
+    await db.songcorrections.clear()
     await db.attempts.bulkAdd(b.attempts as never[])
     await db.cells.bulkPut(b.cells as never[])
+    // v1 backups simply have none of these — restoring one clears the tables,
+    // which is exactly the documented replace-not-merge semantics.
+    if (b.songmaps) await db.songmaps.bulkPut(b.songmaps as never[])
+    if (b.songcorrections) await db.songcorrections.bulkPut(b.songcorrections as never[])
   })
   restoreCalliopeKeys(localStorage, b.localStorage)
   location.reload()

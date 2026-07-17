@@ -18,14 +18,35 @@ export interface Attempt {
   detail?: string
 }
 
+/**
+ * Song Maps and their user-correction overlays (Jam Room). Stored as opaque
+ * JSON documents on purpose: state/ never imports the Spotify module's
+ * types, so deleting src/integrations/spotify still breaks nothing here.
+ * Typed access lives in integrations/spotify/songmap-store.ts.
+ */
+export interface JsonDoc {
+  trackUri: string
+  updatedAt: number
+  data: unknown
+}
+
 const db = new Dexie('calliope') as Dexie & {
   attempts: EntityTable<Attempt, 'id'>
   cells: EntityTable<SkillCell, 'cellKey'>
+  songmaps: EntityTable<JsonDoc, 'trackUri'>
+  songcorrections: EntityTable<JsonDoc, 'trackUri'>
 }
 
 db.version(1).stores({
   attempts: '++id, ts, drill, [drill+degree+key]',
   cells: 'cellKey, drill, lastTs',
+})
+
+db.version(2).stores({
+  attempts: '++id, ts, drill, [drill+degree+key]',
+  cells: 'cellKey, drill, lastTs',
+  songmaps: 'trackUri, updatedAt',
+  songcorrections: 'trackUri, updatedAt',
 })
 
 export async function recordAttempt(a: Attempt): Promise<SkillCell> {

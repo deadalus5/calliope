@@ -1,0 +1,6 @@
+{
+  "port": 8765,
+  "corsOrigins": ["http://127.0.0.1:5173", "https://deadalus5.github.io"],
+  "analyzer": "allin1",
+  "ugCookie": "PASTE YOUR ultimate-guitar.com COOKIE HEADER HERE (only needed for Official charts; copy from DevTools → Network → any UG request → Request Headers → cookie)"
+}

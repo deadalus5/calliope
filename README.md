@@ -49,7 +49,7 @@ where they're always shown.
 | **Triad Atlas** | Triads as fragments of the barre chords you already build: inversion ladders up the neck per string set, plus the slash-chord builder (any triad over any bass you can name — with what jazz would call it). |
 | **Modal Colors** | Each mode as a vamp in the style of a song you know, A/B licks with and without the color notes, then mic-verified color hunts. |
 | **Song Lab** | The band plays changes you know (Mayer, Dead, blues forms) while the fretboard names what your hands already follow. Loop, transpose, slow down. |
-| **Jam Room** | The real recordings via Spotify, with a chart you tap in sync once and the fretboard following it. |
+| **Jam Room** | The real recordings via Spotify, following an auto-built **Song Map**: chords looked up on Ultimate Guitar, key + mode inferred and shown as skeleton + colors, sections and beat grid heard from the audio. Click a section (V1, CH1, SOLO) to jump the record there; the grid and fretboard follow, with a countdown to the next change. Hand-tapped charts remain as the no-sidecar fallback. |
 | **Dark Spots** | Accuracy per degree × key from every drill — the honest map of what needs work. |
 
 ## Jam Room (Spotify) setup — one time
@@ -63,8 +63,28 @@ where they're always shown.
    Jam Room setup screen.
 4. Log in (Premium required; Chrome recommended — playback uses DRM).
 
-Charts are yours: type the changes, play the track, tap spacebar on each
-change once. Saved locally, follows forever.
+### Song Maps (the songsmith sidecar)
+
+The Jam Room learns songs by asking **songsmith**, a small service meant for
+an always-on machine (a Mac mini): it scrapes the Ultimate Guitar chart,
+fetches a duration-matched recording via yt-dlp, runs beat/downbeat/section
+analysis (allin1) locally, and fuses it all into a Song Map the app caches
+forever (Dexie — it rides your backups and works offline once learned).
+
+```bash
+cd songsmith
+./setup.sh          # npm install + Python venv with the analyzer (one time, slow)
+cp config.example.json config.json   # optional: UG Pro cookie for Official charts
+npm start           # → http://127.0.0.1:8765
+```
+
+Point the Jam Room's ⚙ settings at it. From the dev server, plain
+`http://<machine>:8765` works. From the hosted HTTPS site, put Tailscale in
+front of it (`tailscale serve --bg 8765`) and use the `https://….ts.net`
+URL — see `songsmith/README.md` for the three-step walkthrough. First listen
+to a new song takes a minute or two; after that it's instant, sidecar on or
+off. If songsmith is unreachable, the old flow still works: type the
+changes, tap spacebar on each change once.
 
 ## Development
 
@@ -77,6 +97,7 @@ node scripts/verify-eargym.mjs     # E2E: full drill loop with a fake guitarist
 node scripts/verify-songlab.mjs    # E2E: band timing/clipping checks; --bounce records 8 bars
 node scripts/verify-nomic.mjs      # E2E: no-mic mode, tap answers, zero mic requests
 node scripts/verify-guidetone.mjs  # E2E: Song Lab guide-tone drill
+node scripts/verify-jamroom.mjs    # E2E: Song Map Jam Room (stubbed Spotify SDK + fixture sidecar)
 ```
 
 All practice data lives in this browser (IndexedDB + localStorage). No backend.
@@ -95,4 +116,5 @@ src/drills/         mic-verified round machine
 src/state/          Dexie history + EWMA skill cells
 src/integrations/spotify/   isolated; delete it and nothing else breaks
 src/app/            shell + module views
+songsmith/          the Mac-mini sidecar: UG scrape + yt-dlp + allin1 → Song Maps
 ```

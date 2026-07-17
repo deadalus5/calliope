@@ -2,7 +2,10 @@
  * The only bridge between the Spotify module and music-core: re-exports so
  * the integration keeps a single, thin dependency surface.
  */
-export { PC, parseChordSymbol, pcName, type PitchClass } from '../../music-core'
+export {
+  PC, degreeLabel, degreeOf, modeById, parseChordSymbol, pcName,
+  type Chord, type ModeSpec, type PitchClass,
+} from '../../music-core'
 import { PC, type PitchClass } from '../../music-core'
 
 export function playbackKeys(): PitchClass[] {

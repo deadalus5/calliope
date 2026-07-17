@@ -1,6 +1,10 @@
 node_modules
 dist
 dist-ssr
+# songsmith sidecar: machine-local state (config.json can hold the UG cookie)
+songsmith/.venv
+songsmith/cache
+songsmith/config.json
 *.local
 .DS_Store
 .superpowers/

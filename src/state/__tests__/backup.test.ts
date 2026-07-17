@@ -33,8 +33,34 @@ describe('validateBackup', () => {
     expect(validateBackup({ version: 1, exportedAt: 'x', attempts: [], cells: [], localStorage: {} })).toBe(true)
   })
 
-  it('rejects the wrong version', () => {
+  it('rejects unknown versions', () => {
+    expect(validateBackup({ ...canonical(), version: 3 })).toBe(false)
+    expect(validateBackup({ ...canonical(), version: '1' })).toBe(false)
+  })
+
+  it('accepts a v2 backup with song-map doc tables', () => {
+    expect(validateBackup({
+      ...canonical(),
+      version: 2,
+      songmaps: [{ trackUri: 'spotify:track:x', updatedAt: 1, data: { version: 1 } }],
+      songcorrections: [],
+    })).toBe(true)
+  })
+
+  it('rejects v2 without the doc arrays, and rejects bad doc rows', () => {
     expect(validateBackup({ ...canonical(), version: 2 })).toBe(false)
+    expect(validateBackup({
+      ...canonical(),
+      version: 2,
+      songmaps: [{ trackUri: '', updatedAt: 1, data: {} }], // empty uri
+      songcorrections: [],
+    })).toBe(false)
+    expect(validateBackup({
+      ...canonical(),
+      version: 2,
+      songmaps: [],
+      songcorrections: [{ trackUri: 'spotify:track:x', updatedAt: 1, data: 'not-an-object' }],
+    })).toBe(false)
   })
 
   it('rejects a missing attempts array', () => {

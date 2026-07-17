@@ -41,3 +41,82 @@
   color: var(--ember);
   background: #3a2417;
 }
+
+/* --- Song Map follower --- */
+
+.songmap-header { align-items: baseline; }
+.songmap-keyline { font-size: 15px; color: var(--gold); }
+.songmap-provbtn { font-size: 12px; }
+.songmap-provenance { font-size: 12px; line-height: 1.7; }
+
+.songmap-sections {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.songmap-section {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 6px 14px;
+}
+.songmap-section.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: #33290f;
+}
+
+.songmap-nowline { align-items: center; }
+.songmap-next { font-size: 15px; }
+.songmap-countdown {
+  margin-left: 10px;
+  color: var(--gold);
+  letter-spacing: 0.3em;
+  font-size: 10px;
+}
+
+.songmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.songmap-gridsection {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 6px;
+  border-left: 2px solid transparent;
+}
+.songmap-gridsection.active { border-left-color: var(--gold); background: rgba(255, 255, 255, 0.02); }
+.songmap-gridlabel {
+  min-width: 56px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+}
+.songmap-gridchords {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.songmap-chordchip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
+.songmap-chordchip .songmap-chipdeg { font-size: 9.5px; color: var(--ink-dim); }
+.songmap-chordchip.active .songmap-chipdeg { color: inherit; }
+/* The NEXT change gets the target treatment — pearl dashed, eyes lead hands. */
+.songmap-chordchip.next {
+  border-style: dashed;
+  border-color: var(--pearl, #e8e3d5);
+  color: var(--pearl, #e8e3d5);
+}
+
+.songmap-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.songmap-versions button { text-align: left; }
+
+.songmap-progress { font-size: 14px; }

@@ -1,0 +1,22 @@
+{
+  "name": "songsmith",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Calliope's Mac-mini sidecar: UG chords + audio analysis fused into Song Maps",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "execa": "^9.5.0",
+    "got-scraping": "^4.0.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.8.0"
+  }
+}

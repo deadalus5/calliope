@@ -13,6 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}'],
+    // songsmith/ is the Mac-mini sidecar — its pure modules (ug-parse, fuse)
+    // are tested here alongside the app since they share music-core.
+    include: ['src/**/*.test.{ts,tsx}', 'songsmith/src/**/*.test.ts'],
   },
 })
