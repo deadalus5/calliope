@@ -51,9 +51,11 @@ export function Fretboard({
       return
     }
     // Clicks on bare board also audition: snap to nearest string/fret.
+    // The viewBox is `height + 30` tall (fret-number strip) — scale by that,
+    // not `height`, or clicks near the low strings land outside the band.
     const rect = svgRef.current.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * WIDTH
-    const y = ((e.clientY - rect.top) / rect.height) * height
+    const y = ((e.clientY - rect.top) / rect.height) * (height + 30)
     let best: FretCoord | null = null
     let bestDist = 26
     for (let s = 0; s < NUM_STRINGS; s++) {

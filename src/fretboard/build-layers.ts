@@ -1,7 +1,7 @@
 import {
   chordPcs, chordBass, degreeLabel, degreeOf, fullNeck, normalizePc,
   pcOfDegree, pentatonicPosition, coordsForPc,
-  type Chord, type ModeSpec, type PentatonicKind, type PitchClass, type TriadGrip,
+  type Chord, type ChordShape, type ModeSpec, type PentatonicKind, type PitchClass, type TriadGrip,
 } from '../music-core'
 import type { FretboardLayer, NoteMarker } from './layers'
 
@@ -90,6 +90,27 @@ export function gripLayer(grip: TriadGrip, keyRoot: PitchClass, id = 'grip'): Fr
       const degree = degreeOf(grip.pcs[i], keyRoot)
       return { coord, role: 'triad', label: degreeLabel(degree), degree, ring: i === 0 }
     }),
+  }
+}
+
+/**
+ * One library chord shape at exact coords, degrees relative to its own root.
+ * `unanchored` renders it pearl-dashed (target role) — a floating form still
+ * waiting for its root; the ring marks the root anchor either way.
+ */
+export function chordShapeLayer(
+  shape: ChordShape, id: string, opts?: { unanchored?: boolean },
+): FretboardLayer {
+  return {
+    id,
+    zIndex: 40,
+    markers: shape.coords.map((coord, i): NoteMarker => ({
+      coord,
+      role: opts?.unanchored ? 'target' : 'triad',
+      label: degreeLabel(shape.degrees[i]),
+      degree: shape.degrees[i],
+      ring: coord.string === shape.rootString,
+    })),
   }
 }
 

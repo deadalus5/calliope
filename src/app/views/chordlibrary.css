@@ -1,0 +1,180 @@
+/* Chord Library — root wall, flavor cards, shape rail. */
+
+.cl-roots {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cl-root {
+  padding: 9px 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.cl-strings {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.cl-string {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 12px;
+  min-width: 52px;
+}
+.cl-string-num { font-weight: 600; font-size: 14px; }
+.cl-string-name { font-size: 10.5px; color: var(--ink-faint); }
+.cl-string-anchor { border-color: var(--brass); }
+.cl-string-anchor .cl-string-num { color: var(--gold); }
+
+.cl-group { margin-bottom: 10px; }
+.cl-group-name {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--ink-faint);
+  margin: 0 0 5px;
+}
+.cl-flavors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 6px;
+}
+.cl-flavor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.cl-flavor.active {
+  border-color: var(--blue);
+  background: #14303d;
+}
+.cl-flavor-sym { font-weight: 600; font-size: 14px; }
+.cl-flavor.active .cl-flavor-sym { color: var(--blue); }
+.cl-flavor-formula { font-size: 10.5px; color: var(--ink-dim); }
+
+.cl-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 6px;
+}
+.cl-rail-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--ink-faint);
+}
+.cl-rail-nav { display: flex; align-items: center; gap: 6px; }
+.cl-rail-nav button { padding: 3px 11px; font-size: 14px; }
+.cl-rail-count { font-size: 11.5px; color: var(--ink-faint); }
+
+.cl-rail {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.cl-shape {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 14px;
+  min-width: 138px;
+}
+.cl-shape.active {
+  border-color: var(--ember);
+  background: #3a2417;
+}
+.cl-shape-name { font-weight: 600; font-size: 13.5px; }
+.cl-shape.active .cl-shape-name { color: var(--ember); }
+.cl-shape-frets { font-size: 11.5px; color: var(--ink-faint); }
+.cl-shape-ease { font-size: 11.5px; color: var(--ink-dim); letter-spacing: 2px; }
+.cl-rail-more {
+  align-self: center;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+  padding: 0 6px;
+}
+
+.cl-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.cl-main {
+  font-family: var(--font-display);
+  font-size: 40px;
+  color: var(--gold);
+}
+.cl-sub { font-size: 13px; color: var(--ink-dim); }
+.cl-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+.cl-lore { max-width: 980px; }
+.cl-lore-row { margin: 6px 0; color: var(--ink-dim); font-size: 13.5px; }
+.cl-lore-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--ink-faint);
+  margin-right: 8px;
+}
+.cl-lore-row b { color: var(--ink); font-weight: 600; }
+
+.cl-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 2px; }
+.cl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.cl-chip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.cl-chip-off { opacity: 0.45; }
+
+.cl-next { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.cl-next-chip {
+  font-size: 12px;
+  color: var(--ink-dim);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.cl-intro h2 { font-size: 28px; color: var(--gold); margin-bottom: 8px; }
+.cl-intro p { color: var(--ink-dim); max-width: 860px; }
+.cl-intro b { color: var(--ink); }
+
+@media (max-width: 1100px) {
+  .cl-roots { grid-template-columns: repeat(6, 1fr); }
+}

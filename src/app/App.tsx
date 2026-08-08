@@ -7,6 +7,8 @@ import { SongLabView } from './views/SongLabView'
 import { EarGymView } from './views/EarGymView'
 import { TriadAtlasView } from './views/TriadAtlasView'
 import { SlashGuideView } from './views/SlashGuideView'
+import { ChordLibraryView } from './views/ChordLibraryView'
+import { ChordFinderView } from './views/ChordFinderView'
 import { ModalColorsView } from './views/ModalColorsView'
 import { StatsView } from './views/StatsView'
 import { BoardOptions } from '../fretboard/BoardOptions'
@@ -14,6 +16,7 @@ import { MicToggle } from './components/MicToggle'
 import { ToastHost } from './components/Toast'
 import { setMicDisabled } from '../pitch/pitch-engine'
 import { useAppPrefs } from '../state/app-prefs'
+import { useChordLink } from '../state/chord-link'
 import { showToast } from '../state/toasts'
 import './tokens.css'
 import './app.css'
@@ -24,7 +27,9 @@ import './app.css'
  * switching modules always lands in a quiet room.
  */
 
-type ModuleId = 'explore' | 'sing' | 'eargym' | 'triads' | 'slash' | 'modes' | 'songlab' | 'jam' | 'stats'
+type ModuleId =
+  | 'explore' | 'sing' | 'eargym' | 'triads' | 'slash' | 'chordlib' | 'chordfinder'
+  | 'modes' | 'songlab' | 'jam' | 'stats'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
@@ -32,6 +37,8 @@ const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'eargym', label: 'Ear Gym' },
   { id: 'triads', label: 'Triad Atlas' },
   { id: 'slash', label: 'Slash Chords' },
+  { id: 'chordlib', label: 'Chord Library' },
+  { id: 'chordfinder', label: 'Chord Finder' },
   { id: 'modes', label: 'Modal Colors' },
   { id: 'songlab', label: 'Song Lab' },
   { id: 'jam', label: 'Jam Room (Spotify)' },
@@ -49,6 +56,13 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [module, setModule] = useState<ModuleId>('explore')
   const micMode = useAppPrefs((s) => s.micMode)
+  const pendingChordLink = useChordLink((s) => s.pending)
+
+  // Library ↔ Finder handoff: the sending view stages a payload, we switch
+  // modules, and the receiving view consume()s it on mount.
+  useEffect(() => {
+    if (pendingChordLink) setModule(pendingChordLink.target)
+  }, [pendingChordLink])
 
   // Sync the micMode pref into pitch-engine's plain no-mic flag (pitch/
   // can't import state/, per the layering rules). Runs on first mount too,
@@ -152,6 +166,8 @@ export default function App() {
           {module === 'eargym' && <EarGymView />}
           {module === 'triads' && <TriadAtlasView />}
           {module === 'slash' && <SlashGuideView />}
+          {module === 'chordlib' && <ChordLibraryView />}
+          {module === 'chordfinder' && <ChordFinderView />}
           {module === 'modes' && <ModalColorsView />}
           {module === 'songlab' && <SongLabView />}
           {module === 'jam' && (
