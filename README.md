@@ -44,6 +44,7 @@ where they're always shown.
 | Module | What it trains |
 |---|---|
 | **Explore the Map** | The five boxes in any key, ghost notes between boxes (dark-spot work), mode colors on demand. Click anything to hear it. |
+| **Playground** | The free zone: stack any scales, modes, degree sets and hand-built shapes as layers on one board, each with its own colour (preset swatches, a full colour wheel, or per-degree overrides), visibility, solo and paint order. Shared notes draw as rings, split discs, a third colour, or plain top-wins — your choice. Shapes save to a library; the whole board persists. |
 | **Name What You Sing** | Free ear-to-hand: drone sets the key, sing anything, see its degree and every place it lives on the neck. |
 | **Ear Gym** | The translation gap, drilled. *Hear → find* (a note sounds, find it on the guitar; the mic scores your first note and your speed) and *name → sing*. An adaptive model steers targets toward your weak degrees and keys. |
 | **Triad Atlas** | Triads as fragments of the barre chords you already build: inversion ladders up the neck per string set, plus the slash-chord builder (any triad over any bass you can name — with what jazz would call it). |
@@ -100,6 +101,7 @@ node scripts/verify-songlab.mjs    # E2E: band timing/clipping checks; --bounce 
 node scripts/verify-nomic.mjs      # E2E: no-mic mode, tap answers, zero mic requests
 node scripts/verify-guidetone.mjs  # E2E: Song Lab guide-tone drill
 node scripts/verify-jamroom.mjs    # E2E: Song Map Jam Room (stubbed Spotify SDK + fixture sidecar)
+node scripts/verify-playground.mjs # E2E: Playground layers, overlap styles, shape library, persistence
 ```
 
 All practice data lives in this browser (IndexedDB + localStorage). No backend.

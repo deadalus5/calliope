@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { startAudio } from '../audio/context'
 import { onLoadError } from '../audio/load-errors'
 import { ExploreView } from './views/ExploreView'
+import { PlaygroundView } from './views/PlaygroundView'
 import { SingView } from './views/SingView'
 import { SongLabView } from './views/SongLabView'
 import { EarGymView } from './views/EarGymView'
@@ -28,11 +29,12 @@ import './app.css'
  */
 
 type ModuleId =
-  | 'explore' | 'sing' | 'eargym' | 'triads' | 'slash' | 'chordlib' | 'chordfinder'
+  | 'explore' | 'playground' | 'sing' | 'eargym' | 'triads' | 'slash' | 'chordlib' | 'chordfinder'
   | 'modes' | 'songlab' | 'jam' | 'stats'
 
 const MODULES: { id: ModuleId; label: string }[] = [
   { id: 'explore', label: 'Explore the Map' },
+  { id: 'playground', label: 'Playground' },
   { id: 'sing', label: 'Name What You Sing' },
   { id: 'eargym', label: 'Ear Gym' },
   { id: 'triads', label: 'Triad Atlas' },
@@ -162,6 +164,7 @@ export default function App() {
           )}
 
           {module === 'explore' && <ExploreView />}
+          {module === 'playground' && <PlaygroundView />}
           {module === 'sing' && <SingView />}
           {module === 'eargym' && <EarGymView />}
           {module === 'triads' && <TriadAtlasView />}

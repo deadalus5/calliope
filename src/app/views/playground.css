@@ -1,0 +1,285 @@
+/* Playground — layered scales, custom colours, shared-note glyphs. */
+
+.pg-intro h2 { font-size: 28px; color: var(--gold); margin-bottom: 8px; }
+.pg-intro p { color: var(--ink-dim); max-width: 860px; }
+.pg-intro b { color: var(--ink); }
+
+/* ---- markers: the layer's colour arrives as --pgc, treatment picks the paint.
+   Same conventions as the shared board (fb-*), but these glyphs can also tint,
+   nest rings, or split into wedges — which is why they live here, not there. */
+
+.pg-marker text {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.pg-solid .pg-dot {
+  fill: var(--pgc, #ffc94d);
+  stroke: #ffffff;
+  stroke-width: 1;
+  filter: drop-shadow(0 0 7px var(--pgc, rgba(255, 201, 77, 0.6)));
+}
+.pg-solid .pg-label { fill: #14100a; }
+
+.pg-outline .pg-dot { fill: #101014; stroke: var(--pgc, #8a8a92); stroke-width: 1.8; }
+.pg-outline .pg-label { fill: var(--pgc, #cfcabd); }
+
+.pg-dashed .pg-dot {
+  fill: color-mix(in srgb, var(--pgc, #f5ecd4) 12%, transparent);
+  stroke: var(--pgc, #f5ecd4);
+  stroke-width: 1.8;
+  stroke-dasharray: 3.5 3;
+}
+.pg-dashed .pg-label { fill: var(--pgc, #f5ecd4); }
+
+/* shared-note glyphs: rings and wedges carry their colours inline; the label
+   floats above any mix with a dark halo so it reads on every palette */
+.pg-label-over {
+  fill: #fff6e3;
+  stroke: #060608;
+  stroke-width: 2.6px;
+  paint-order: stroke;
+}
+.pg-split-rim { fill: none; stroke: #060608; stroke-width: 1; }
+
+/* editing a shape: the target layer pulses, everything else recedes
+   (the receding is computed opacity in PlaygroundMarkers, not CSS) */
+@keyframes pg-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.pg-editing .pg-dot,
+.pg-editing .pg-core,
+.pg-editing .pg-wedge { animation: pg-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pg-editing .pg-dot,
+  .pg-editing .pg-core,
+  .pg-editing .pg-wedge { animation: none; }
+}
+
+/* ---- shell ---- */
+
+.pg-hint {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin: 2px 0 8px;
+}
+
+.pg-edit-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px dashed var(--brass);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 4px 0 10px;
+  color: var(--ink-dim);
+  font-size: 13.5px;
+}
+.pg-edit-banner b { color: var(--gold); }
+
+.pg-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 10px;
+}
+.pg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.pg-chip-off { opacity: 0.45; }
+.pg-chip-solo { border-color: var(--gold); }
+.pg-chip-shared { color: var(--ink-dim); }
+
+.pg-dot-chip {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+
+.pg-add-row { row-gap: 8px; }
+
+.pg-saved summary {
+  cursor: pointer;
+  color: var(--ink-dim);
+  font-size: 13.5px;
+}
+.pg-saved-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.pg-saved-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 6px 3px 12px;
+}
+.pg-saved-chip button { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+
+/* ---- layer cards ---- */
+
+.pg-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pg-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.pg-card-hidden { opacity: 0.6; }
+
+.pg-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pg-order { display: flex; flex-direction: column; gap: 2px; }
+.pg-order button { font-size: 9px; line-height: 1; padding: 3px 6px; }
+
+.pg-name {
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  color: var(--ink);
+  padding: 2px 6px;
+  text-align: left;
+}
+.pg-name:hover { color: var(--gold); }
+.pg-name-input {
+  font-family: var(--font-display);
+  font-size: 15px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+  padding: 4px 8px;
+  min-width: 180px;
+}
+.pg-spacer { flex: 1; }
+.pg-card-head > button:not(.pg-name) { font-size: 12.5px; padding: 4px 10px; }
+
+.pg-config { margin-bottom: 8px; row-gap: 8px; }
+.pg-visual-row { margin-bottom: 6px; row-gap: 8px; }
+
+.pg-vibe {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink-dim);
+  font-style: italic;
+  margin: 0 0 10px;
+}
+
+.pg-note-count { font-size: 12.5px; color: var(--ink-dim); }
+
+.pg-save { display: inline-flex; align-items: center; gap: 6px; }
+.pg-save-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  width: 130px;
+}
+
+.pg-degree-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+}
+.pg-degree-chip {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  min-width: 38px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-faint);
+}
+.pg-degree-chip.active {
+  border-color: var(--pgc, var(--gold));
+  color: var(--pgc, var(--gold));
+  background: color-mix(in srgb, var(--pgc, #ffc94d) 14%, transparent);
+}
+
+/* ---- colour controls ---- */
+
+.pg-swatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.pg-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  flex: none;
+}
+.pg-swatch:hover { transform: scale(1.12); }
+.pg-swatch.active {
+  border-color: var(--pearl);
+  box-shadow: 0 0 0 2px rgba(255, 246, 227, 0.3);
+}
+
+/* the native colour input, dressed as one more chip with a rainbow rim */
+.pg-wheel {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: none;
+  border-radius: 50%;
+  background: conic-gradient(#ff6161, #ffc94d, #8fe388, #5ac8fa, #b99cff, #ff6fa5, #ff6161);
+  cursor: pointer;
+  flex: none;
+}
+.pg-wheel::-webkit-color-swatch-wrapper { padding: 0; }
+.pg-wheel::-webkit-color-swatch { border: 2px solid #060608; border-radius: 50%; }
+
+.pg-custom-colours {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.pg-custom-row { display: inline-flex; align-items: center; gap: 6px; }
+.pg-degree-tag { font-size: 12px; color: var(--ink-dim); min-width: 22px; text-align: right; }
+.pg-mini { font-size: 11px; padding: 2px 8px; }
