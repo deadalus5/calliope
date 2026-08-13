@@ -24,6 +24,7 @@ node scripts/verify-nomic.mjs <outdir>      # no-mic mode: tap-to-answer drills,
 node scripts/verify-guidetone.mjs <outdir>  # Song Lab guide-tone drill: pearls the upcoming chord's 3rd/7th, scores mic locks
 node scripts/verify-jamroom.mjs <outdir>    # Song Map Jam Room: stubbed Spotify SDK clock + fixture sidecar; section nav, grid follow, seeks, Dexie persistence
 node scripts/verify-chords.mjs <outdir>     # Chord Library + Finder: root/flavor/board-click anchoring, the G→G5→Gsus2 naming flow, Library↔Finder handoff round-trip
+node scripts/verify-triads.mjs <outdir>     # Triad Atlas: E/A root anchors appear once per string, lowest octave only (pins the phantom fret-12+ twin)
 node scripts/verify-playground.mjs <outdir> # Playground: default two-pent stack, overlap styles (ring/split/third), show filters, shape editing + saved-shape library, reload persistence
 node scripts/screenshot.mjs <outdir>        # walks views and screenshots them
 

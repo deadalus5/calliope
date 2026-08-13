@@ -195,7 +195,7 @@ export function ChordLibraryView() {
         id: `cl-anchors-${root}`,
         zIndex: 8,
         markers: coordsForPc(root)
-          .filter((c) => c.string <= 1)
+          .filter((c) => c.string <= 1 && c.fret < 12)
           .map((coord): NoteMarker => ({ coord, role: 'root', label: pcName(root, root), degree: 0 })),
       })
       if (mode === 'rootOnly') {

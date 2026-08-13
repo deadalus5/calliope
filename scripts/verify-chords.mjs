@@ -82,6 +82,9 @@ for (let s = 0; s < 6; s++) {
   const n = await page.locator(`.fb-marker[data-string="${s}"][data-fret="${f}"]`).count()
   if (n < 1) await fail(`no marker at string ${s} fret ${f} for G7 shape`)
 }
+// ...and no phantom octave-up anchor: G's low-E anchor is fret 3, never 15.
+const phantom = await page.locator('.fb-marker[data-string="0"][data-fret="15"]').count()
+if (phantom > 0) await fail(`phantom octave-up root anchor at low E fret 15 (${phantom} marker[s])`)
 await shot('09-chordlib-g7.png')
 
 // Root-string choice: anchor G7 on the A string.

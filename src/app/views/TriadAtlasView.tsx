@@ -54,12 +54,12 @@ function Atlas() {
 
   const layers = useMemo(() => {
     const out: FretboardLayer[] = []
-    // anchors: everywhere the chord root lives on his two known strings
+    // anchors: the chord root on his two known strings, lowest octave only
     out.push({
       id: 'anchor-roots',
       zIndex: 8,
       markers: [0, 1].flatMap((s) =>
-        Array.from({ length: 18 }, (_, f) => ({ string: s, fret: f }))
+        Array.from({ length: 12 }, (_, f) => ({ string: s, fret: f }))
           .filter((c) => degreeOf(coordToMidi(c) % 12, root) === 0)
           .map((coord) => ({ coord, role: 'root' as const, label: pcName(root, root) })),
       ),
