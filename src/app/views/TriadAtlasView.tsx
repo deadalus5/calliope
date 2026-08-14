@@ -54,16 +54,6 @@ function Atlas() {
 
   const layers = useMemo(() => {
     const out: FretboardLayer[] = []
-    // anchors: the chord root on his two known strings, lowest octave only
-    out.push({
-      id: 'anchor-roots',
-      zIndex: 8,
-      markers: [0, 1].flatMap((s) =>
-        Array.from({ length: 12 }, (_, f) => ({ string: s, fret: f }))
-          .filter((c) => degreeOf(coordToMidi(c) % 12, root) === 0)
-          .map((coord) => ({ coord, role: 'root' as const, label: pcName(root, root) })),
-      ),
-    })
     // the ladder, ghosted; the chosen grip, lit
     for (const [i, g] of grips.entries()) {
       if (g === grip) continue
@@ -127,7 +117,7 @@ function Atlas() {
 
         <p className="vibe-line">
           Same three notes — {chordPcs(triad).map((pc) => pcName(pc, root)).join(', ')} — reshuffled up the neck.
-          Click a step to hear it; the gold {pcName(root, root)}s on your E and A strings are the anchors it hangs from.
+          Click a step to hear it; the lit grip is the one you&apos;d play, the dim ones are its next homes.
         </p>
 
         <Fretboard

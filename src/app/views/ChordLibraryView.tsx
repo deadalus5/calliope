@@ -191,13 +191,16 @@ export function ChordLibraryView() {
       out.push(skeletonLayer(root, quality.intervals.includes(3) ? 'minor' : 'major', 'all'))
     }
     if (root !== null) {
-      out.push({
-        id: `cl-anchors-${root}`,
-        zIndex: 8,
-        markers: coordsForPc(root)
-          .filter((c) => c.string <= 1 && c.fret < 12)
-          .map((coord): NoteMarker => ({ coord, role: 'root', label: pcName(root, root), degree: 0 })),
-      })
+      // E/A anchor roots only while browsing — once a grip is up, the board is the grip's notes alone
+      if (shape === undefined) {
+        out.push({
+          id: `cl-anchors-${root}`,
+          zIndex: 8,
+          markers: coordsForPc(root)
+            .filter((c) => c.string <= 1 && c.fret < 12)
+            .map((coord): NoteMarker => ({ coord, role: 'root', label: pcName(root, root), degree: 0 })),
+        })
+      }
       if (mode === 'rootOnly') {
         out.push({
           id: `cl-root-everywhere-${root}`,

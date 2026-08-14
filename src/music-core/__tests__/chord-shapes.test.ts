@@ -92,6 +92,18 @@ describe('shapeFromFrets', () => {
     const open = shapeFromFrets([0, 2, 2, 1, 0, 0], PC.E, 'maj', 't', 'generated')
     expect(open!.barre).toBeUndefined()
   })
+
+  it('rejects a shape whose pitches do not climb — the root must be the true bass', () => {
+    // "G7" at fret 10 with the open D and B ringing below the root: really G7/D.
+    expect(shapeFromFrets([-1, 10, 0, 10, 0, -1], PC.G, 'dom7', 't', 'generated')).toBeNull()
+  })
+
+  it('never fabricates a barre across a ringing open string', () => {
+    // Bb9 (no 5th), x-1-0-1-1-x: three strings on fret 1 but the open D sits inside the span.
+    const s = shapeFromFrets([-1, 1, 0, 1, 1, -1], PC.As, 'dom9', 't', 'generated')
+    expect(s).not.toBeNull()
+    expect(s!.barre).toBeUndefined()
+  })
 })
 
 describe('curated data validates numerically', () => {

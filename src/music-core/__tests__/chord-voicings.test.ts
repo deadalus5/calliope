@@ -87,6 +87,41 @@ describe('coverage: every quality voices at every root', () => {
   })
 })
 
+describe('verified shapes always outrank computed ones', () => {
+  it('never lists a generated shape before a curated one', () => {
+    for (const q of QUALITIES) {
+      for (const root of [PC.C, PC.E, PC.G, PC.A, PC.As]) {
+        const shapes = findVoicings({ root, qualityId: q.id })
+        const firstGenerated = shapes.findIndex((s) => s.source === 'generated')
+        if (firstGenerated === -1) continue
+        for (const s of shapes.slice(firstGenerated)) {
+          expect(s.source, `${q.id} at pc ${root}`).toBe('generated')
+        }
+      }
+    }
+  })
+
+  it('G7 anchored at A-string fret 10: the A-shape barre, not an open-string hybrid', () => {
+    const first = findVoicings({ root: PC.G, qualityId: 'dom7', rootString: 1, nearFret: 10 })[0]
+    expect(first.source).toBe('curated')
+    expect(first.frets).toEqual([-1, 10, 12, 10, 12, 10])
+  })
+})
+
+describe('every served voicing keeps the root in the bass', () => {
+  it('midis climb strictly, across all qualities and roots', () => {
+    for (const q of QUALITIES) {
+      for (let root = 0; root < 12; root++) {
+        for (const s of findVoicings({ root, qualityId: q.id })) {
+          for (let i = 1; i < s.midis.length; i++) {
+            expect(s.midis[i], `${q.id} pc ${root}: ${s.frets.join(',')}`).toBeGreaterThan(s.midis[i - 1])
+          }
+        }
+      }
+    }
+  })
+})
+
 describe('generateVoicings', () => {
   it('keeps the result count sane for the UI', () => {
     for (const q of QUALITIES) {

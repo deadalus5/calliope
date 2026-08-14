@@ -114,6 +114,10 @@ export function shapeFromFrets(
     degrees.push(degreeOf(pc, rootPc))
   }
   if (degrees[0] !== 0) return null // shapes anchor on their root
+  const midis = coords.map(coordToMidi)
+  for (let i = 1; i < midis.length; i++) {
+    if (midis[i] <= midis[i - 1]) return null // pitches must climb string to string — the root is the true bass
+  }
 
   const present = new Set(degrees)
   for (const d of requiredDegrees(quality)) if (!present.has(d)) return null
@@ -125,7 +129,10 @@ export function shapeFromFrets(
   let b = barre
   if (b === undefined && baseFret > 0) {
     const atBase = coords.filter((c) => c.fret === baseFret).map((c) => c.string)
-    if (atBase.length >= 3) {
+    const openInside = coords.some(
+      (c) => c.fret === 0 && c.string > atBase[0] && c.string < atBase[atBase.length - 1],
+    )
+    if (atBase.length >= 3 && !openInside) {
       b = { fret: baseFret, fromString: atBase[0], toString: atBase[atBase.length - 1] }
     }
   }
@@ -138,7 +145,7 @@ export function shapeFromFrets(
     baseFret,
     span,
     coords,
-    midis: coords.map(coordToMidi),
+    midis,
     degrees,
     omitted: quality.intervals.filter((i) => !present.has(normalizePc(i))),
     label,

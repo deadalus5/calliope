@@ -82,9 +82,12 @@ for (let s = 0; s < 6; s++) {
   const n = await page.locator(`.fb-marker[data-string="${s}"][data-fret="${f}"]`).count()
   if (n < 1) await fail(`no marker at string ${s} fret ${f} for G7 shape`)
 }
-// ...and no phantom octave-up anchor: G's low-E anchor is fret 3, never 15.
+// ...and nothing that isn't the shape: no octave-up phantom on the low E, and
+// no stray root anchor on the A string (open G7 doesn't touch fret 10).
 const phantom = await page.locator('.fb-marker[data-string="0"][data-fret="15"]').count()
 if (phantom > 0) await fail(`phantom octave-up root anchor at low E fret 15 (${phantom} marker[s])`)
+const stray = await page.locator('.fb-marker[data-string="1"][data-fret="10"]').count()
+if (stray > 0) await fail(`stray root anchor at A string fret 10 while the open G7 grip is up (${stray} marker[s])`)
 await shot('09-chordlib-g7.png')
 
 // Root-string choice: anchor G7 on the A string.
@@ -94,13 +97,18 @@ dbg = await waitDbg(
   'G7 re-anchored on the A string',
 )
 
-// Board-click anchoring: tap G at A-string fret 10 — same root, exact spot.
+// Board-click anchoring: tap G at A-string fret 10 — same root, exact spot,
+// and the served grip must be the verified A-shape barre, never a computed hybrid.
 await boardClick(1, 10)
 dbg = await waitDbg(
   (d) => d.chordLibSymbol === 'G7' && Array.isArray(d.chordLibFrets) && d.chordLibFrets[1] === 10,
   'board-click anchored the root at A string fret 10',
 )
-console.log('anchored shape:', dbg.chordLibFrets.join(','))
+if (dbg.chordLibSource !== 'curated') await fail(`anchored G7 is ${dbg.chordLibSource}, expected curated`)
+if (dbg.chordLibFrets.join(',') !== '-1,10,12,10,12,10') {
+  await fail(`anchored G7 is ${dbg.chordLibFrets.join(',')}, expected the A-shape barre -1,10,12,10,12,10`)
+}
+console.log('anchored shape:', dbg.chordLibFrets.join(','), 'source:', dbg.chordLibSource)
 await shot('09-chordlib-anchored.png')
 
 // Flavor-first flow: clear the root — the shape stays visible, floating.

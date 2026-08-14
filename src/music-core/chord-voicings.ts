@@ -168,7 +168,7 @@ export function shapeDifficulty(s: ChordShape): number {
   )
 }
 
-/** Curated + generated shapes, deduped (curated wins), easiest first. */
+/** Curated + generated shapes, deduped (curated wins), every curated grip before any generated one, easiest first within each. */
 export function findVoicings(q: VoicingQuery): ChordShape[] {
   const rootPc = normalizePc(q.root)
   let curated = curatedShapes(rootPc, q.qualityId)
@@ -188,8 +188,8 @@ export function findVoicings(q: VoicingQuery): ChordShape[] {
     shapeDifficulty(s) +
     (q.nearFret !== undefined ? 1.5 * Math.abs(s.frets[s.rootString] - q.nearFret) : 0)
   return merged
-    .map((s) => ({ s, d: score(s) }))
-    .sort((a, b) => a.d - b.d)
+    .map((s) => ({ s, d: score(s), gen: s.source === 'curated' ? 0 : 1 }))
+    .sort((a, b) => a.gen - b.gen || a.d - b.d)
     .map((x) => x.s)
 }
 
