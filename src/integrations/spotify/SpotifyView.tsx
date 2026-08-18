@@ -11,6 +11,7 @@ import {
   seekMs, togglePlay, type PlayerState, type TrackHit,
 } from './player'
 import { chartFor, deleteChart, entryAt, saveChart, type TrackChart } from './charts'
+import { SongLibrary } from './SongLibrary'
 import { SongMapFollower } from './SongMapFollower'
 import { SongsmithSettings } from './SongsmithSettings'
 import { VersionPicker } from './VersionPicker'
@@ -113,6 +114,7 @@ function JamRoom({ player }: { player: PlayerState }) {
   const [songmap, setSongmap] = useState<SongMap | null>(null)
   const [manualMode, setManualMode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
 
   const sidecarUrl = useSidecar((s) => s.url)
 
@@ -173,6 +175,9 @@ function JamRoom({ player }: { player: PlayerState }) {
 
   return (
     <div>
+      {(!player.trackUri || showLibrary) && (
+        <SongLibrary onPick={(uri) => { setShowLibrary(false); void playTrack(uri) }} />
+      )}
       <div className="panel">
         <div className="controls">
           <input
@@ -189,6 +194,11 @@ function JamRoom({ player }: { player: PlayerState }) {
             </span>
           )}
           <button onClick={() => togglePlay()}>{player.paused ? 'play' : 'pause'}</button>
+          {player.trackUri && (
+            <button className="songmap-libbtn" onClick={() => setShowLibrary((v) => !v)}>
+              learned songs
+            </button>
+          )}
           <button
             className="spotify-gearbtn"
             onClick={() => setShowSettings((v) => !v)}

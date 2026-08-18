@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,6 +24,13 @@ export interface SongsmithConfig {
 
 export const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
+/** setup.sh installs a PO-token-capable yt-dlp at ~/.local/bin (YouTube 403s
+ * most plain-stable downloads now); prefer it when present. */
+function defaultYtdlp(): string {
+  const uvTool = join(homedir(), '.local', 'bin', 'yt-dlp')
+  return existsSync(uvTool) ? uvTool : 'yt-dlp'
+}
+
 export function loadConfig(): SongsmithConfig {
   const defaults: SongsmithConfig = {
     port: 8765,
@@ -30,7 +38,7 @@ export function loadConfig(): SongsmithConfig {
     corsOrigins: ['http://127.0.0.1:5173', 'https://deadalus5.github.io'],
     cacheDir: join(PACKAGE_ROOT, 'cache'),
     analyzer: 'allin1',
-    ytdlpPath: 'yt-dlp',
+    ytdlpPath: defaultYtdlp(),
     venvDir: join(PACKAGE_ROOT, '.venv'),
   }
   const path = join(PACKAGE_ROOT, 'config.json')

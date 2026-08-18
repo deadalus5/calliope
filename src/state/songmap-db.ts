@@ -29,3 +29,8 @@ export async function putCorrectionsDoc(trackUri: string, data: unknown): Promis
 export async function songMapCount(): Promise<number> {
   return db.songmaps.count()
 }
+
+/** All Song Map docs, newest first (the learned-song library reads these). */
+export async function listSongMapDocs(): Promise<JsonDoc[]> {
+  return db.songmaps.orderBy('updatedAt').reverse().toArray()
+}

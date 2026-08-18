@@ -1,5 +1,5 @@
 import {
-  getCorrectionsDoc, getSongMapDoc, putCorrectionsDoc, putSongMapDoc, deleteSongMapDoc,
+  getCorrectionsDoc, getSongMapDoc, listSongMapDocs, putCorrectionsDoc, putSongMapDoc, deleteSongMapDoc,
 } from '../../state/songmap-db'
 import {
   emptyCorrections, migrateCorrections, migrateSongMap,
@@ -33,4 +33,15 @@ export async function loadCorrections(trackUri: string): Promise<UserCorrections
 
 export async function saveCorrections(c: UserCorrections): Promise<void> {
   await putCorrectionsDoc(c.trackUri, c)
+}
+
+/** Every learned song, newest first; unreadable docs silently dropped. */
+export async function listSongMaps(): Promise<{ map: SongMap; updatedAt: number }[]> {
+  const docs = await listSongMapDocs()
+  const out: { map: SongMap; updatedAt: number }[] = []
+  for (const doc of docs) {
+    const map = migrateSongMap(doc.data)
+    if (map) out.push({ map, updatedAt: doc.updatedAt })
+  }
+  return out
 }

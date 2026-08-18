@@ -13,11 +13,16 @@ fi
 echo "node: $(node --version)"
 npm install
 
-# 2. yt-dlp
-if command -v yt-dlp >/dev/null; then
-  echo "yt-dlp: $(yt-dlp --version)"
+# 2. yt-dlp — YouTube now gates most downloads behind PO tokens; the nightly
+# build plus the bgutil provider plugin mints them. The uv-tool install is
+# isolated at ~/.local/bin/yt-dlp, which config.ts prefers automatically.
+if command -v uv >/dev/null; then
+  uv tool install --prerelease=allow --with bgutil-ytdlp-pot-provider yt-dlp@latest
+  echo "yt-dlp: $("$HOME/.local/bin/yt-dlp" --version) (at ~/.local/bin/yt-dlp, with PO-token provider)"
+elif command -v yt-dlp >/dev/null; then
+  echo "yt-dlp: $(yt-dlp --version) — WARNING: stable builds without the bgutil PO-token provider often hit HTTP 403 on YouTube"
 else
-  echo "yt-dlp not found — brew install yt-dlp" >&2; exit 1
+  echo "yt-dlp not found — install uv (https://docs.astral.sh/uv/) or brew install yt-dlp" >&2; exit 1
 fi
 
 # 3. ffmpeg (yt-dlp needs it for m4a extraction; allin1 for demixing; the

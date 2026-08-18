@@ -120,3 +120,44 @@
 .songmap-versions button { text-align: left; }
 
 .songmap-progress { font-size: 14px; }
+
+/* --- section loop --- */
+
+.songmap-sectionwrap { display: inline-flex; align-items: stretch; gap: 2px; }
+.songmap-loopbtn { font-size: 12px; padding: 6px 8px; }
+.songmap-loopbtn.active { border-color: var(--gold); color: var(--gold); background: #33290f; }
+.songmap-section.looping { border-style: dashed; }
+
+/* --- correction bar (Tap 2.0) --- */
+
+.songmap-correctionbar {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.songmap-tapbtn { font-size: 16px; padding: 12px 24px; }
+.songmap-tapreadout { font-size: 13px; }
+.songmap-correctionhint { font-size: 12px; margin: 0; }
+.songmap-fixbtn.active { border-color: var(--gold); color: var(--gold); background: #33290f; }
+.songmap-chipwrap { display: inline-flex; align-items: center; gap: 2px; }
+.songmap-nudge { font-size: 11px; padding: 4px 6px; }
+
+/* --- learned-song library --- */
+
+.songmap-librows { display: flex; flex-direction: column; gap: 6px; }
+.songmap-librow { display: flex; align-items: stretch; gap: 6px; }
+.songmap-libplay {
+  flex: 1;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.songmap-libtitle { font-size: 14px; }
+.songmap-libmeta { font-size: 12px; }
+.songmap-libdelete { font-size: 12px; padding: 4px 10px; }
