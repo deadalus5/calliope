@@ -273,6 +273,11 @@ export function fuse(input: FuseInput): SongMap {
     list.push(c)
     bySection.set(c.sectionId, list)
   }
+  // Cap each occurrence's key-evidence weight at two bars: durationBeats is
+  // gap-to-next-change, so a chord held before a sparse stretch (or ending a
+  // section) otherwise casts hundreds of votes and drags the tonic with it
+  // (this is exactly how Gravity's long-ringing C outvoted G).
+  const weightCap = 2 * beatsPerBar
   const weighted: WeightedChord[] = []
   for (const [sectionId, list] of bySection) {
     void sectionId
@@ -280,7 +285,7 @@ export function fuse(input: FuseInput): SongMap {
       try {
         weighted.push({
           chord: parseChordSymbol(c.symbol),
-          weightBeats: c.durationBeats,
+          weightBeats: Math.min(weightCap, c.durationBeats),
           sectionStart: i === 0,
           sectionEnd: i === list.length - 1,
         })
@@ -297,7 +302,7 @@ export function fuse(input: FuseInput): SongMap {
       try {
         return [{
           chord: parseChordSymbol(c.symbol),
-          weightBeats: c.durationBeats,
+          weightBeats: Math.min(weightCap, c.durationBeats),
           sectionStart: i === 0,
           sectionEnd: i === arr.length - 1,
         }]

@@ -83,6 +83,15 @@ app.post('/pick', async (c) => {
   return c.json(jobs.pick(body.uri, { tabId: body.tabId, youtubeUrl: body.youtubeUrl }))
 })
 
+app.post('/refine', async (c) => {
+  const body = await c.req.json<{ uri?: string; artist?: string; title?: string; durationMs?: number }>()
+  if (!body.uri) return c.json({ message: 'missing uri' }, 400)
+  const params = body.artist && body.title && Number.isFinite(body.durationMs)
+    ? { trackUri: body.uri, trackName: body.title, artistName: body.artist, durationMs: body.durationMs! }
+    : undefined
+  return c.json(jobs.refine(body.uri, params))
+})
+
 app.post('/reanalyze', async (c) => {
   const body = await c.req.json<{
     uri?: string

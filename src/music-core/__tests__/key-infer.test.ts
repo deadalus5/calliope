@@ -71,9 +71,28 @@ describe('inferKey', () => {
     expect(r.root).toBe(PC.A)
   })
 
+  it('resolves a same-notes mode tie to the plainer key at the opening chord (the Gravity case)', () => {
+    // G C D7 Am7 use the same pitch set as C lydian; the song opens on G and
+    // C rings out long at section ends, and UG's sheet even claims "C" — a
+    // guitarist still calls this G major, and so must we.
+    const r = inferKey(
+      {
+        chords: [
+          wc('G', 8, { start: true }), wc('C', 16, { end: true }),
+          wc('G', 8, { start: true }), wc('C', 16, { end: true }),
+          wc('G', 8, { start: true }), wc('Am7', 4), wc('D7', 4), wc('C', 12, { end: true }),
+        ],
+      },
+      { tonalityName: 'C' },
+    )
+    expect(r.root).toBe(PC.G)
+    expect(r.modeId).toBe('ionian')
+  })
+
   it('reports confidence in [0,1], higher for clearer keys', () => {
     const clear = inferKey({ chords: [wc('A', 16, { start: true, end: true }), wc('D', 8), wc('E7', 8)] })
-    const vague = inferKey({ chords: [wc('C', 4), wc('D', 4), wc('E', 4), wc('F#', 4)] })
+    // Chromatic drift — no root should stand out.
+    const vague = inferKey({ chords: [wc('C', 4), wc('F#', 4), wc('D', 4), wc('Ab', 4)] })
     expect(clear.confidence).toBeGreaterThan(0)
     expect(clear.confidence).toBeLessThanOrEqual(1)
     expect(vague.confidence).toBeLessThanOrEqual(clear.confidence)

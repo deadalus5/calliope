@@ -4,7 +4,7 @@ import type { AudioMatch, UgVersionInfo } from './types'
 
 /** Job status vocabulary + the pure disk-recovery logic (no I/O here). */
 
-export type Stage = 'ug' | 'audio' | 'analyze' | 'fuse'
+export type Stage = 'ug' | 'audio' | 'analyze' | 'fuse' | 'refine'
 
 export type JobStatus =
   | { status: 'ready'; songmap: SongMap }

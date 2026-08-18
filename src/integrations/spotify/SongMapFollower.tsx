@@ -22,11 +22,13 @@ import { useSongMapPlayhead } from './use-songmap-playhead'
  * live here too.
  */
 
-export function SongMapFollower({ map, onRedo, onPickTab }: {
+export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
   map: SongMap
   onRedo: () => void
   /** Re-pick the UG chart (keeps the audio/analysis cache). */
   onPickTab?: (tabId: number) => void
+  /** Chroma-refine the timing (hidden once the map is refined). */
+  onRefine?: () => void
 }) {
   const [showProvenance, setShowProvenance] = useState(false)
   const [fixTiming, setFixTiming] = useState(false)
@@ -97,6 +99,9 @@ export function SongMapFollower({ map, onRedo, onPickTab }: {
           >
             {loadingVersions ? 'looking…' : 'change chart'}
           </button>
+        )}
+        {onRefine && !map.provenance.refined && (
+          <button className="songmap-refinebtn" onClick={onRefine}>tighten timing</button>
         )}
         <button onClick={onRedo}>redo this song</button>
       </div>

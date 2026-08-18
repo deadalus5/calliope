@@ -1,10 +1,13 @@
 import { mkdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { execa } from 'execa'
 import { analyzerVersion, runAnalyzer, toAnalyzerResult } from './analyze'
 import { downloadAudio, MATCH_THRESHOLD, searchCandidates, videoIdFromUrl } from './audio'
 import { TrackCache } from './cache'
-import type { SongsmithConfig } from './config'
+import { PACKAGE_ROOT, type SongsmithConfig } from './config'
 import { fuse } from './fuse'
 import { autoPickTab } from './pick'
+import { applyRefinement, buildRefineRequest, type RefineResponse } from './refine'
 import { statusFromDisk, type JobStatus, type Stage, type TrackParams } from './status'
 import { extractJsStore, parseTabPage } from './ug-parse'
 import { fetchTab, searchUg } from './ug'
@@ -29,6 +32,7 @@ interface JobState {
 const HINTS: [RegExp, string][] = [
   [/ENOENT.*yt-dlp|yt-dlp.*ENOENT/i, 'yt-dlp not found — brew install yt-dlp'],
   [/analyzer not installed/i, 'run songsmith/setup.sh once to build the Python venv'],
+  [/librosa|refine_chroma|No module named/i, 'the refiner needs librosa — re-run songsmith/setup.sh once'],
   [/js-store/i, 'UG may have served a challenge page — try again in a minute'],
   [/no Chords versions/i, 'no usable chart on UG — the manual tap chart still works'],
   [/no chord content/i, 'the Official chart needs a logged-in UG Pro cookie in songsmith/config.json'],
@@ -45,6 +49,11 @@ export class JobRunner {
 
   constructor(private config: SongsmithConfig) {}
 
+  /** The map a reader should get: refined when present, else the fused one. */
+  private bestMap(cache: TrackCache): SongMap | null {
+    return cache.readJson<SongMap>('songmap.refined.json') ?? cache.readJson<SongMap>('songmap.json')
+  }
+
   /** Current state for a track; starts the pipeline if nothing exists yet. */
   request(params: TrackParams): JobStatus {
     const cache = new TrackCache(this.config.cacheDir, params.trackUri)
@@ -52,7 +61,7 @@ export class JobRunner {
     if (job?.running) return job.current
     // Not running: the disk is the truth — a durable error or pending pick
     // must not silently restart the pipeline (retry/pick are the way out).
-    const disk = statusFromDisk(cache.readMeta(), cache.readJson<SongMap>('songmap.json'))
+    const disk = statusFromDisk(cache.readMeta(), this.bestMap(cache))
     if (disk) return disk
     if (job) return job.current
 
@@ -70,7 +79,57 @@ export class JobRunner {
     const job = this.jobs.get(trackUri)
     if (job?.running) return job.current
     const cache = new TrackCache(this.config.cacheDir, trackUri)
-    return statusFromDisk(cache.readMeta(), cache.readJson<SongMap>('songmap.json')) ?? job?.current ?? null
+    return statusFromDisk(cache.readMeta(), this.bestMap(cache)) ?? job?.current ?? null
+  }
+
+  /** Chroma-refine an already-fused map. Non-destructive: writes
+   * songmap.refined.json beside the original, or nothing when the gate
+   * refuses — a refine failure never costs a working map. */
+  refine(trackUri: string, params?: TrackParams): JobStatus {
+    const cache = new TrackCache(this.config.cacheDir, trackUri)
+    const p = params ?? this.paramsOf(trackUri, cache)
+    if (!p) return { status: 'error', stage: 'refine', message: 'unknown track — request the songmap first' }
+    const already = cache.readJson<SongMap>('songmap.refined.json')
+    if (already) return { status: 'ready', songmap: already }
+    const fused = cache.readJson<SongMap>('songmap.json')
+    if (!fused) return { status: 'error', stage: 'refine', message: 'no Song Map to refine yet' }
+    if (!cache.has('audio.m4a')) return { status: 'error', stage: 'refine', message: 'no cached audio for this song — redo it first' }
+    const existing = this.jobs.get(trackUri)
+    if (existing?.running) return existing.current
+    const state: JobState = {
+      running: true,
+      current: { status: 'working', stage: 'refine', detail: 'listening closer — lining chords up with the chroma…' },
+      params: p,
+    }
+    this.jobs.set(trackUri, state)
+    this.enqueue(() => this.runRefine(state, cache, fused))
+    return state.current
+  }
+
+  private async runRefine(state: JobState, cache: TrackCache, fused: SongMap): Promise<void> {
+    try {
+      const req = buildRefineRequest(fused, cache.path('audio.m4a'))
+      cache.writeJson('refine-request.json', req)
+      const py = join(this.config.venvDir, 'bin', 'python')
+      const script = join(PACKAGE_ROOT, 'py', 'refine_chroma.py')
+      const { stdout } = await execa(py, [script, cache.path('refine-request.json')], { timeout: 300_000 })
+      const lines = stdout.trim().split('\n')
+      const res = JSON.parse(lines[lines.length - 1]) as RefineResponse
+      if (res.error) throw new Error(res.error)
+      const refined = applyRefinement(fused, res, new Date().toISOString())
+      if (refined) cache.writeJson('songmap.refined.json', refined)
+      // Gate refused ⇒ the fused timing stands; either way the reader gets
+      // a ready map and the badge tells the user which one.
+      state.current = { status: 'ready', songmap: refined ?? fused }
+      state.running = false
+    } catch (e) {
+      // Deliberately NOT written to meta.lastError: a refine failure must
+      // never turn a working song into a durable error state.
+      const message = (e as Error).message
+      console.error(`refine failed for ${state.params.trackUri}: ${message.slice(0, 300)}`)
+      state.current = { status: 'error', stage: 'refine', message, hint: hintFor(message) }
+      state.running = false
+    }
   }
 
   /** Track identity from memory or the persisted meta (post-restart picks). */
@@ -94,6 +153,7 @@ export class JobRunner {
       meta.chosenTabId = choice.tabId
       meta.pendingVersions = undefined
       cache.remove('songmap.json') // chart changed; analysis cache survives
+      cache.remove('songmap.refined.json')
     }
     if (choice.youtubeUrl !== undefined) {
       const id = videoIdFromUrl(choice.youtubeUrl)
@@ -103,6 +163,7 @@ export class JobRunner {
       cache.remove('audio.m4a')
       cache.remove('allin1.json')
       cache.remove('songmap.json')
+      cache.remove('songmap.refined.json')
     }
     cache.writeMeta(meta)
     const state: JobState = {
@@ -135,7 +196,10 @@ export class JobRunner {
       cache.remove('allin1.json')
     }
     if (stage === 'analyze' || stage === 'all') cache.remove('allin1.json')
-    if (stage !== 'retry') cache.remove('songmap.json')
+    if (stage !== 'retry') {
+      cache.remove('songmap.json')
+      cache.remove('songmap.refined.json')
+    }
     const state: JobState = {
       running: true,
       current: { status: 'working', stage: 'ug', detail: 'redoing…' },

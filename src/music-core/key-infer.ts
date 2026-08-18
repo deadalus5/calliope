@@ -48,6 +48,14 @@ const TONIC_BONUS_BEATS = 4
 const HINT_BONUS_BEATS = 6
 /** Extra when the hint's major/minor also matches the mode's skeleton. */
 const HINT_SKELETON_BONUS_BEATS = 3
+/**
+ * A mode-of-the-same-notes tie (C lydian vs G ionian) must fall to the
+ * plainer hearing — a guitarist calls Gravity "G", never "C lydian". The
+ * rarer modes pay a small evidence premium so they only win when their
+ * color notes actually earn it.
+ */
+const EXOTIC_MODE_PENALTY_BEATS = 3
+const EXOTIC_MODES = new Set(['lydian', 'phrygian'])
 
 /** Parse 'Am' / 'Bb' / 'F#m' into a concert-pitch root + minor flag. */
 export function parseTonality(name: string, capo = 0): { root: PitchClass; minor: boolean } | null {
@@ -60,25 +68,46 @@ export function parseTonality(name: string, capo = 0): { root: PitchClass; minor
   }
 }
 
-/** Duration-weighted fraction of chord tones inside the mode, plus boundary
- * tonic gravity. Exported for the per-section second pass. */
+/** The very first chord of the input — songs overwhelmingly open on (or
+ * near) home, and unlike section ENDS this position is not an artifact of
+ * how fusion sliced chords across analyzer segments. */
+const OPENING_BONUS_BEATS = 6
+
+/** Duration-weighted fraction of chord tones inside the mode, plus tonic
+ * gravity. Section STARTS count double what ends do: the fuser pins a
+ * section's first chord to a real analyzer boundary, while "the chord
+ * before the next segment" is often mid-phrase. Exported for the
+ * per-section second pass. */
 export function fitScore(input: KeyInferInput, root: PitchClass, mode: ModeSpec): number {
   const inMode = new Set(modeDegrees(mode))
-  let score = 0
-  for (const wc of input.chords) {
+  let fit = 0
+  let totalWeight = 0
+  let bonus = 0
+  input.chords.forEach((wc, idx) => {
     const pcs = chordPcs(wc.chord)
     let hits = 0
     for (const pc of pcs) if (inMode.has(degreeOf(pc, root))) hits++
-    score += wc.weightBeats * (hits / pcs.length)
-    if ((wc.sectionStart || wc.sectionEnd) && wc.chord.root === root) {
-      score += TONIC_BONUS_BEATS * (wc.sectionStart && wc.sectionEnd ? 2 : 1)
-      // A tonic whose third agrees with the skeleton is stronger evidence.
-      const third = wc.chord.quality.intervals.includes(3) ? 'minor'
-        : wc.chord.quality.intervals.includes(4) ? 'major' : null
-      if (third === mode.skeleton) score += TONIC_BONUS_BEATS / 2
+    fit += wc.weightBeats * (hits / pcs.length)
+    totalWeight += wc.weightBeats
+    if (wc.chord.root === root) {
+      let b = 0
+      if (wc.sectionStart) b += TONIC_BONUS_BEATS
+      if (wc.sectionEnd) b += TONIC_BONUS_BEATS / 2
+      if (idx === 0) b += OPENING_BONUS_BEATS
+      if (b > 0) {
+        // A tonic whose third agrees with the skeleton is stronger evidence.
+        const third = wc.chord.quality.intervals.includes(3) ? 'minor'
+          : wc.chord.quality.intervals.includes(4) ? 'major' : null
+        if (third === mode.skeleton) b += TONIC_BONUS_BEATS / 2
+      }
+      bonus += b
     }
-  }
-  return score
+  })
+  // Tonic gravity only means something inside a coherent key: bonuses are
+  // scaled by the mean diatonic fit, so chromatic mush can't ride an opening
+  // chord to a confident-looking wrong answer.
+  const meanFit = totalWeight > 0 ? fit / totalWeight : 0
+  return fit + bonus * meanFit
 }
 
 /**
@@ -94,6 +123,7 @@ export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyRe
   for (let root = 0 as PitchClass; root < 12; root++) {
     for (const mode of MODES) {
       let score = fitScore(input, root, mode)
+      if (EXOTIC_MODES.has(mode.id)) score -= EXOTIC_MODE_PENALTY_BEATS
       if (hint && hint.root === root) {
         score += HINT_BONUS_BEATS
         const hintSkeleton = hint.minor ? 'minor' : 'major'
@@ -127,11 +157,14 @@ export function inferSectionKeys(perSection: KeyInferInput[], whole: SongKeyResu
   const wholeMode = MODES.find((m) => m.id === whole.modeId) ?? MODES[0]
   return perSection.map((section) => {
     const totalBeats = section.chords.reduce((s, c) => s + c.weightBeats, 0)
-    if (section.chords.length < 2 || totalBeats < 8) return null
+    // Real modulations bring a progression, not a lick: three chords
+    // minimum, and a decisive margin (a false flip repaints the whole
+    // fretboard mid-song, the worst possible failure).
+    if (section.chords.length < 3 || totalBeats < 8) return null
     const own = inferKey(section)
     if (own.root === whole.root) return null
     const wholeScore = fitScore(section, whole.root, wholeMode)
     const ownScore = fitScore(section, own.root, MODES.find((m) => m.id === own.modeId) ?? MODES[0])
-    return ownScore > wholeScore * 1.15 ? own : null
+    return ownScore > wholeScore * 1.25 ? own : null
   })
 }

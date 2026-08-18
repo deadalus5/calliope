@@ -17,7 +17,7 @@ import { SongsmithSettings } from './SongsmithSettings'
 import { VersionPicker } from './VersionPicker'
 import { useSidecar } from './sidecar-store'
 import { loadSongMap, removeSongMap } from './songmap-store'
-import { reanalyze, type SongmapStatus, type TrackParams } from './songsmith-client'
+import { reanalyze, requestRefine, type SongmapStatus, type TrackParams } from './songsmith-client'
 import { useSongmapRequest } from './use-songmap-request'
 import type { SongMap } from './songmap'
 import './spotify.css'
@@ -171,6 +171,15 @@ function JamRoom({ player }: { player: PlayerState }) {
     setSongmap(null)
   }
 
+  const tightenTiming = async () => {
+    if (!trackParams) return
+    await requestRefine(trackParams)
+    // The polling hook takes over: shows the refine progress, then saves
+    // whichever map comes back (refined, or the original if the gate
+    // refused). The Dexie copy stays until the fresh save lands.
+    setSongmap(null)
+  }
+
   const sidecarConfigured = Boolean(sidecarUrl)
 
   return (
@@ -222,7 +231,14 @@ function JamRoom({ player }: { player: PlayerState }) {
 
       {player.trackUri && (
         songmap
-          ? <SongMapFollower map={songmap} onRedo={() => void redoSong()} onPickTab={(tabId) => void changeChart(tabId)} />
+          ? (
+            <SongMapFollower
+              map={songmap}
+              onRedo={() => void redoSong()}
+              onPickTab={(tabId) => void changeChart(tabId)}
+              onRefine={sidecarConfigured ? () => void tightenTiming() : undefined}
+            />
+          )
           : <SongPrep
               player={player}
               chart={chart}

@@ -139,6 +139,18 @@ export async function reanalyze(params: TrackParams, stage: 'ug' | 'audio' | 'an
   }))
 }
 
+/** Chroma-refine an already-analyzed song ("tighten timing"). */
+export async function requestRefine(params: TrackParams): Promise<SongmapStatus> {
+  return toStatus(await call('/refine', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      uri: params.trackUri,
+      artist: params.artistName, title: params.trackName, durationMs: Math.round(params.durationMs),
+    }),
+  }))
+}
+
 export interface SidecarHealth {
   ok: boolean
   ytdlpVersion: string | null
