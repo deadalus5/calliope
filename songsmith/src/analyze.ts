@@ -33,8 +33,7 @@ export function toAnalyzerResult(raw: Allin1Json): AnalyzerResult {
 export async function analyzerVersion(config: SongsmithConfig): Promise<string> {
   try {
     const pip = join(config.venvDir, 'bin', 'pip')
-    const pkg = config.analyzer === 'mlx' ? 'all-in-one-mlx' : 'allin1'
-    const { stdout } = await execa(pip, ['show', pkg], { timeout: 15_000 })
+    const { stdout } = await execa(pip, ['show', 'allin1'], { timeout: 15_000 })
     const m = /^Version:\s*(.+)$/m.exec(stdout)
     return m ? m[1].trim() : 'unknown'
   } catch {

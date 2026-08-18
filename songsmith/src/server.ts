@@ -6,7 +6,8 @@ import { readdirSync } from 'node:fs'
 import { analyzerVersion } from './analyze'
 import { loadConfig } from './config'
 import { JobRunner, type Stage } from './jobs'
-import { searchUg, versionScore } from './ug'
+import { versionScore } from './pick'
+import { searchUg } from './ug'
 
 /**
  * Songsmith — Calliope's Mac-mini sidecar. One instance, one user. The app
@@ -85,7 +86,7 @@ app.post('/pick', async (c) => {
 app.post('/reanalyze', async (c) => {
   const body = await c.req.json<{
     uri?: string
-    stage?: Stage | 'all'
+    stage?: Stage | 'all' | 'retry'
     artist?: string
     title?: string
     durationMs?: number

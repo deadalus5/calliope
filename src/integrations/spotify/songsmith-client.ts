@@ -10,13 +10,21 @@ import { migrateSongMap, type SongMap } from './songmap'
 const LS_URL = 'spotify:songsmithUrl'
 
 export function getSongsmithUrl(): string | null {
-  const v = localStorage.getItem(LS_URL)
-  return v && v.trim().length > 0 ? v.trim().replace(/\/$/, '') : null
+  // try/catch: the sidecar store reads this at module init, which must not
+  // explode in environments without localStorage (tests).
+  try {
+    const v = localStorage.getItem(LS_URL)
+    return v && v.trim().length > 0 ? v.trim().replace(/\/$/, '') : null
+  } catch {
+    return null
+  }
 }
 
 export function setSongsmithUrl(url: string): void {
-  if (url.trim()) localStorage.setItem(LS_URL, url.trim())
-  else localStorage.removeItem(LS_URL)
+  try {
+    if (url.trim()) localStorage.setItem(LS_URL, url.trim())
+    else localStorage.removeItem(LS_URL)
+  } catch { /* storage unavailable — session-only config */ }
 }
 
 export interface UgVersionChoice {
@@ -50,8 +58,8 @@ export interface TrackParams {
   durationMs: number
 }
 
-async function call(path: string, init?: RequestInit): Promise<unknown | { offline: true }> {
-  const base = getSongsmithUrl()
+async function call(path: string, init?: RequestInit, baseOverride?: string): Promise<unknown | { offline: true }> {
+  const base = baseOverride ?? getSongsmithUrl()
   if (!base) return { offline: true }
   try {
     const res = await fetch(`${base}${path}`, init)
@@ -110,7 +118,17 @@ export async function pickVersion(trackUri: string, choice: { tabId?: number; yo
   }))
 }
 
-export async function reanalyze(params: TrackParams, stage: 'ug' | 'audio' | 'analyze' | 'all'): Promise<SongmapStatus> {
+/** Top UG versions for the re-pick flow ("change chart"). Null on any failure. */
+export async function listVersions(params: { artistName: string; trackName: string }): Promise<UgVersionChoice[] | null> {
+  const q = new URLSearchParams({ artist: params.artistName, title: params.trackName })
+  const raw = await call(`/versions?${q}`)
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  if ('offline' in r || !Array.isArray(r.versions)) return null
+  return r.versions as UgVersionChoice[]
+}
+
+export async function reanalyze(params: TrackParams, stage: 'ug' | 'audio' | 'analyze' | 'all' | 'retry'): Promise<SongmapStatus> {
   return toStatus(await call('/reanalyze', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -129,8 +147,8 @@ export interface SidecarHealth {
   cacheCount: number
 }
 
-export async function sidecarHealth(): Promise<SidecarHealth | null> {
-  const raw = await call('/health')
+export async function sidecarHealth(opts?: { base?: string; signal?: AbortSignal }): Promise<SidecarHealth | null> {
+  const raw = await call('/health', opts?.signal ? { signal: opts.signal } : undefined, opts?.base)
   if (typeof raw !== 'object' || raw === null || 'offline' in (raw as Record<string, unknown>)) return null
   const r = raw as Record<string, unknown>
   return {

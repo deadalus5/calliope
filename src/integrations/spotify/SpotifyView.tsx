@@ -14,11 +14,10 @@ import { chartFor, deleteChart, entryAt, saveChart, type TrackChart } from './ch
 import { SongMapFollower } from './SongMapFollower'
 import { SongsmithSettings } from './SongsmithSettings'
 import { VersionPicker } from './VersionPicker'
-import { loadSongMap, removeSongMap, saveSongMap } from './songmap-store'
-import {
-  getSongsmithUrl, pickVersion, reanalyze, requestSongMap,
-  type SongmapStatus, type TrackParams,
-} from './songsmith-client'
+import { useSidecar } from './sidecar-store'
+import { loadSongMap, removeSongMap } from './songmap-store'
+import { reanalyze, type SongmapStatus, type TrackParams } from './songsmith-client'
+import { useSongmapRequest } from './use-songmap-request'
 import type { SongMap } from './songmap'
 import './spotify.css'
 
@@ -112,23 +111,31 @@ function JamRoom({ player }: { player: PlayerState }) {
   const [hits, setHits] = useState<TrackHit[]>([])
   const [chart, setChart] = useState<TrackChart | null>(null)
   const [songmap, setSongmap] = useState<SongMap | null>(null)
-  const [fetchState, setFetchState] = useState<SongmapStatus | null>(null)
   const [manualMode, setManualMode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
-  const trackParams: TrackParams | null = player.trackUri
-    ? {
-        trackUri: player.trackUri,
-        trackName: player.trackName,
-        artistName: player.artistName,
-        durationMs: player.durationMs,
-      }
-    : null
+  const sidecarUrl = useSidecar((s) => s.url)
+
+  // One probe per Jam Room visit; on the dev origin this also adopts a
+  // locally-running sidecar nobody ever configured — the auto flow must
+  // never be silently invisible.
+  useEffect(() => { void useSidecar.getState().autoDiscover() }, [])
+
+  const trackParams: TrackParams | null = useMemo(
+    () => player.trackUri
+      ? {
+          trackUri: player.trackUri,
+          trackName: player.trackName,
+          artistName: player.artistName,
+          durationMs: player.durationMs,
+        }
+      : null,
+    [player.trackUri, player.trackName, player.artistName, player.durationMs],
+  )
 
   // Track change: learned Song Map from Dexie first, legacy tap chart as fallback.
   useEffect(() => {
     setSongmap(null)
-    setFetchState(null)
     setManualMode(false)
     setChart(player.trackUri ? chartFor(player.trackUri) : null)
     if (!player.trackUri) return
@@ -138,39 +145,31 @@ function JamRoom({ player }: { player: PlayerState }) {
   }, [player.trackUri])
 
   // No map yet + sidecar configured: ask songsmith and poll until it lands.
-  // The request is idempotent — polling never restarts a failed job. Wait
-  // for a real duration: it drives the recording match on the sidecar.
-  useEffect(() => {
-    if (!trackParams || trackParams.durationMs <= 0 || songmap || manualMode || !getSongsmithUrl()) return
-    let alive = true
-    const poll = async () => {
-      const status = await requestSongMap(trackParams)
-      if (!alive) return
-      setFetchState(status)
-      if (status.status === 'ready') {
-        await saveSongMap(status.songmap)
-        if (alive) setSongmap(status.songmap)
-      }
-    }
-    void poll()
-    const timer = setInterval(() => void poll(), 2000)
-    return () => { alive = false; clearInterval(timer) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.trackUri, player.durationMs > 0, songmap, manualMode])
+  const { fetchState, retry, pickTab, pickUrl } = useSongmapRequest({
+    params: trackParams,
+    haveMap: songmap !== null,
+    manualMode,
+    onReady: setSongmap,
+  })
 
+  // Order matters in both flows below: the sidecar must invalidate its
+  // cached songmap.json BEFORE the request loop restarts, or the next poll
+  // just reads the old map straight back.
   const redoSong = async () => {
     if (!trackParams) return
+    await reanalyze(trackParams, 'all')
     await removeSongMap(trackParams.trackUri)
     setSongmap(null)
-    setFetchState(await reanalyze(trackParams, 'all'))
   }
 
-  const pick = async (choice: { tabId?: number; youtubeUrl?: string }) => {
+  const changeChart = async (tabId: number) => {
     if (!trackParams) return
-    setFetchState(await pickVersion(trackParams.trackUri, choice))
+    await pickTab(tabId)
+    await removeSongMap(trackParams.trackUri)
+    setSongmap(null)
   }
 
-  const sidecarConfigured = Boolean(getSongsmithUrl())
+  const sidecarConfigured = Boolean(sidecarUrl)
 
   return (
     <div>
@@ -190,7 +189,13 @@ function JamRoom({ player }: { player: PlayerState }) {
             </span>
           )}
           <button onClick={() => togglePlay()}>{player.paused ? 'play' : 'pause'}</button>
-          <button onClick={() => setShowSettings((v) => !v)} title="songsmith sidecar settings">⚙</button>
+          <button
+            className="spotify-gearbtn"
+            onClick={() => setShowSettings((v) => !v)}
+            aria-label="songsmith sidecar settings"
+          >
+            ⚙ songsmith
+          </button>
         </div>
         {hits.length > 0 && (
           <div className="spotify-hits">
@@ -207,7 +212,7 @@ function JamRoom({ player }: { player: PlayerState }) {
 
       {player.trackUri && (
         songmap
-          ? <SongMapFollower map={songmap} onRedo={() => void redoSong()} />
+          ? <SongMapFollower map={songmap} onRedo={() => void redoSong()} onPickTab={(tabId) => void changeChart(tabId)} />
           : <SongPrep
               player={player}
               chart={chart}
@@ -215,8 +220,10 @@ function JamRoom({ player }: { player: PlayerState }) {
               sidecarConfigured={sidecarConfigured}
               manualMode={manualMode}
               onManual={() => setManualMode(true)}
-              onPickTab={(tabId) => void pick({ tabId })}
-              onPickUrl={(youtubeUrl) => void pick({ youtubeUrl })}
+              onRetry={retry}
+              onOpenSettings={() => setShowSettings(true)}
+              onPickTab={(tabId) => void pickTab(tabId)}
+              onPickUrl={(youtubeUrl) => void pickUrl(youtubeUrl)}
               onChart={setChart}
               onRetapChart={() => { deleteChart(player.trackUri!); setChart(null) }}
             />
@@ -226,14 +233,17 @@ function JamRoom({ player }: { player: PlayerState }) {
 }
 
 /** Everything shown for a track that has no Song Map yet: songsmith progress,
- * pickers, errors — with the hand-tapped chart flow always reachable. */
-function SongPrep({ player, chart, fetchState, sidecarConfigured, manualMode, onManual, onPickTab, onPickUrl, onChart, onRetapChart }: {
+ * pickers, errors — with the hand-tapped chart flow always reachable, and the
+ * sidecar's absence always SAID, never silent. */
+function SongPrep({ player, chart, fetchState, sidecarConfigured, manualMode, onManual, onRetry, onOpenSettings, onPickTab, onPickUrl, onChart, onRetapChart }: {
   player: PlayerState
   chart: TrackChart | null
   fetchState: SongmapStatus | null
   sidecarConfigured: boolean
   manualMode: boolean
   onManual: () => void
+  onRetry: () => void
+  onOpenSettings: () => void
   onPickTab: (tabId: number) => void
   onPickUrl: (url: string) => void
   onChart: (c: TrackChart) => void
@@ -243,7 +253,24 @@ function SongPrep({ player, chart, fetchState, sidecarConfigured, manualMode, on
     ? <ChartFollower chart={chart} onRebuild={onRetapChart} />
     : <ChartMaker player={player} onSaved={onChart} />
 
-  if (manualMode || !sidecarConfigured) return legacy
+  if (manualMode) return legacy
+
+  if (!sidecarConfigured) {
+    return (
+      <>
+        <div className="panel songmap-setup-hint">
+          <p className="dim">
+            Auto-chords are off — songsmith isn't connected. It looks up the chart, hears out the
+            beat, and follows the record for you; the hand-tapped flow below always works too.
+          </p>
+          <div className="controls">
+            <button className="primary songmap-connectbtn" onClick={onOpenSettings}>connect songsmith</button>
+          </div>
+        </div>
+        {legacy}
+      </>
+    )
+  }
 
   if (fetchState?.status === 'pick') {
     return (
@@ -262,11 +289,12 @@ function SongPrep({ player, chart, fetchState, sidecarConfigured, manualMode, on
         <div className="panel">
           <p className="dim">
             {fetchState.status === 'offline'
-              ? 'songsmith is not reachable — is it running on the mini?'
+              ? <>songsmith is not reachable — start it with <span className="mono">cd songsmith && npm start</span> (or check the machine it runs on)</>
               : `songsmith hit a wall (${fetchState.stage ?? '?'}): ${fetchState.message}`}
             {fetchState.status === 'error' && fetchState.hint && <><br />hint: {fetchState.hint}</>}
           </p>
           <div className="controls">
+            <button className="primary songmap-retrybtn" onClick={onRetry}>retry</button>
             <button onClick={onManual}>tap a chart by hand instead</button>
           </div>
         </div>

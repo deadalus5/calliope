@@ -14,8 +14,8 @@ export interface SongsmithConfig {
   cacheDir: string
   /** Ultimate Guitar session cookie — needed only for Official charts. */
   ugCookie?: string
-  /** 'allin1' (stock CLI) or 'mlx' (all-in-one-mlx port). */
-  analyzer: 'allin1' | 'mlx'
+  /** Analyzer engine — allin1 is the only one wired up. */
+  analyzer: 'allin1'
   ytdlpPath: string
   /** Python venv the analyzer lives in (from setup.sh). */
   venvDir: string

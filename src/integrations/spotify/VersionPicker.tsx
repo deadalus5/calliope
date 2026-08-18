@@ -6,9 +6,11 @@ import type { AudioCandidate, UgVersionChoice } from './songsmith-client'
  * (pick a community version), or no confident YouTube match (pick the
  * recording, or paste a URL).
  */
-export function VersionPicker({ versions, audioCandidates, onPickTab, onPickUrl }: {
+export function VersionPicker({ versions, audioCandidates, currentTabId, onPickTab, onPickUrl }: {
   versions?: UgVersionChoice[]
   audioCandidates?: AudioCandidate[]
+  /** Marks the version the current Song Map was built from. */
+  currentTabId?: number
   onPickTab: (tabId: number) => void
   onPickUrl: (url: string) => void
 }) {
@@ -19,12 +21,15 @@ export function VersionPicker({ versions, audioCandidates, onPickTab, onPickUrl 
       {versions && versions.length > 0 && (
         <>
           <h3>Pick the chart</h3>
-          <p className="dim">No Official chart on UG for this one — these are the top community versions.</p>
+          <p className="dim">The top charts on UG for this song — pick the one that matches how you hear it.</p>
           <div className="songmap-versions">
             {versions.map((v) => (
               <button key={v.tabId} onClick={() => onPickTab(v.tabId)}>
                 {v.versionLabel}
-                <span className="dim"> · ★{v.rating.toFixed(1)} ({v.votes} votes){v.tonalityName ? ` · in ${v.tonalityName}` : ''}</span>
+                <span className="dim">
+                  {' '}· ★{v.rating.toFixed(1)} ({v.votes} votes){v.tonalityName ? ` · in ${v.tonalityName}` : ''}
+                  {v.tabId === currentTabId ? ' · current' : ''}
+                </span>
               </button>
             ))}
           </div>

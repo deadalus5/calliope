@@ -4,9 +4,11 @@ import { downloadAudio, MATCH_THRESHOLD, searchCandidates, videoIdFromUrl } from
 import { TrackCache } from './cache'
 import type { SongsmithConfig } from './config'
 import { fuse } from './fuse'
+import { autoPickTab } from './pick'
+import { statusFromDisk, type JobStatus, type Stage, type TrackParams } from './status'
 import { extractJsStore, parseTabPage } from './ug-parse'
-import { autoPickTab, fetchTab, searchUg } from './ug'
-import type { AnalyzerResult, AudioMatch, UgChart, UgVersionInfo } from './types'
+import { fetchTab, searchUg } from './ug'
+import type { AnalyzerResult, AudioMatch, UgChart } from './types'
 import type { SongMap } from '../../src/integrations/spotify/songmap'
 
 /**
@@ -15,20 +17,8 @@ import type { SongMap } from '../../src/integrations/spotify/songmap'
  * a re-run after a pick or an error only does the missing work.
  */
 
-export type Stage = 'ug' | 'audio' | 'analyze' | 'fuse'
-
-export type JobStatus =
-  | { status: 'ready'; songmap: SongMap }
-  | { status: 'working'; stage: Stage; detail: string }
-  | { status: 'pick'; versions?: UgVersionInfo[]; audioCandidates?: AudioMatch[] }
-  | { status: 'error'; stage: Stage; message: string; hint?: string }
-
-export interface TrackParams {
-  trackUri: string
-  trackName: string
-  artistName: string
-  durationMs: number
-}
+export { statusFromDisk }
+export type { JobStatus, Stage, TrackParams }
 
 interface JobState {
   running: boolean
@@ -58,10 +48,12 @@ export class JobRunner {
   /** Current state for a track; starts the pipeline if nothing exists yet. */
   request(params: TrackParams): JobStatus {
     const cache = new TrackCache(this.config.cacheDir, params.trackUri)
-    const existing = cache.readJson<SongMap>('songmap.json')
-    if (existing) return { status: 'ready', songmap: existing }
-
     const job = this.jobs.get(params.trackUri)
+    if (job?.running) return job.current
+    // Not running: the disk is the truth — a durable error or pending pick
+    // must not silently restart the pipeline (retry/pick are the way out).
+    const disk = statusFromDisk(cache.readMeta(), cache.readJson<SongMap>('songmap.json'))
+    if (disk) return disk
     if (job) return job.current
 
     const state: JobState = {
@@ -75,19 +67,29 @@ export class JobRunner {
   }
 
   status(trackUri: string): JobStatus | null {
+    const job = this.jobs.get(trackUri)
+    if (job?.running) return job.current
     const cache = new TrackCache(this.config.cacheDir, trackUri)
-    const existing = cache.readJson<SongMap>('songmap.json')
-    if (existing) return { status: 'ready', songmap: existing }
-    return this.jobs.get(trackUri)?.current ?? null
+    return statusFromDisk(cache.readMeta(), cache.readJson<SongMap>('songmap.json')) ?? job?.current ?? null
+  }
+
+  /** Track identity from memory or the persisted meta (post-restart picks). */
+  private paramsOf(trackUri: string, cache: TrackCache): TrackParams | null {
+    const inMem = this.jobs.get(trackUri)?.params
+    if (inMem) return inMem
+    const saved = cache.readMeta().params
+    return saved
+      ? { trackUri, trackName: saved.trackName, artistName: saved.artistName, durationMs: saved.durationMs }
+      : null
   }
 
   /** Apply a user pick (UG version or YouTube URL) and re-run what's needed. */
   pick(trackUri: string, choice: { tabId?: number; youtubeUrl?: string }): JobStatus {
-    const job = this.jobs.get(trackUri)
-    const params = job?.params
-    if (!params) return { status: 'error', stage: 'ug', message: 'no active job for this track — request the songmap first' }
     const cache = new TrackCache(this.config.cacheDir, trackUri)
+    const params = this.paramsOf(trackUri, cache)
+    if (!params) return { status: 'error', stage: 'ug', message: 'unknown track — request the songmap first' }
     const meta = cache.readMeta()
+    meta.lastError = undefined
     if (choice.tabId !== undefined) {
       meta.chosenTabId = choice.tabId
       meta.pendingVersions = undefined
@@ -113,12 +115,15 @@ export class JobRunner {
     return state.current
   }
 
-  /** Cache-bust a stage and re-run. */
-  reanalyze(trackUri: string, stage: Stage | 'all', params?: TrackParams): JobStatus {
-    const job = this.jobs.get(trackUri)
-    const p = params ?? job?.params
-    if (!p) return { status: 'error', stage: 'ug', message: 'unknown track — request the songmap first' }
+  /**
+   * Cache-bust a stage and re-run. 'retry' busts nothing — it clears the
+   * durable error and re-runs the pipeline, which skips every cached stage,
+   * so a transient failure (UG hiccup, network) costs no repeated work.
+   */
+  reanalyze(trackUri: string, stage: Stage | 'all' | 'retry', params?: TrackParams): JobStatus {
     const cache = new TrackCache(this.config.cacheDir, trackUri)
+    const p = params ?? this.paramsOf(trackUri, cache)
+    if (!p) return { status: 'error', stage: 'ug', message: 'unknown track — request the songmap first' }
     if (stage === 'ug' || stage === 'all') {
       const meta = cache.readMeta()
       if (meta.chosenTabId) cache.remove(`ug-${meta.chosenTabId}.json`)
@@ -130,7 +135,7 @@ export class JobRunner {
       cache.remove('allin1.json')
     }
     if (stage === 'analyze' || stage === 'all') cache.remove('allin1.json')
-    cache.remove('songmap.json')
+    if (stage !== 'retry') cache.remove('songmap.json')
     const state: JobState = {
       running: true,
       current: { status: 'working', stage: 'ug', detail: 'redoing…' },
@@ -154,11 +159,14 @@ export class JobRunner {
     let stage: Stage = 'ug'
     try {
       cache.ensureDir()
+      const meta = cache.readMeta()
+      meta.trackUri = params.trackUri
+      meta.params = { trackName: params.trackName, artistName: params.artistName, durationMs: params.durationMs }
+      meta.lastError = undefined
+      cache.writeMeta(meta)
 
       // --- Stage: UG chart -------------------------------------------------
       this.setStage(state, 'ug', 'finding the chart on Ultimate Guitar…')
-      const meta = cache.readMeta()
-      meta.trackUri = params.trackUri
       let chart: UgChart
       let fallbackReason: string | undefined
       const cachedRaw = meta.chosenTabId ? cache.readJson<{ url: string; store: unknown }>(`ug-${meta.chosenTabId}.json`) : null
@@ -173,14 +181,7 @@ export class JobRunner {
         cache.writeJson(`ug-${chart.tabId}.json`, { url: v.url, store: fetched.rawStore })
       } else {
         const versions = await searchUg(params.artistName, params.trackName, this.config.ugCookie)
-        const picked = await autoPickTab(versions, this.config.ugCookie)
-        if ('choices' in picked) {
-          meta.pendingVersions = picked.choices
-          cache.writeMeta(meta)
-          state.current = { status: 'pick', versions: picked.choices }
-          state.running = false
-          return
-        }
+        const picked = await autoPickTab(versions, this.config.ugCookie, fetchTab)
         chart = picked.tab.chart
         fallbackReason = picked.fallbackReason
         meta.chosenTabId = chart.tabId
@@ -198,7 +199,7 @@ export class JobRunner {
         this.setStage(state, 'audio', 'finding the recording…')
         if (meta.chosenVideoId) {
           audioProv = {
-            videoId: String(meta.chosenVideoId), videoTitle: 'user-picked', channel: '',
+            videoId: meta.chosenVideoId, videoTitle: 'user-picked', channel: '',
             durationMs: params.durationMs, matchScore: 1,
           }
         } else {
@@ -248,7 +249,7 @@ export class JobRunner {
           durationMs: audioProv.durationMs,
           matchScore: audioProv.matchScore,
         },
-        analyzerName: this.config.analyzer === 'mlx' ? 'all-in-one-mlx' : 'allin1',
+        analyzerName: 'allin1',
         analyzerVersion: version,
         now: new Date().toISOString(),
       })

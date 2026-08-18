@@ -15,9 +15,11 @@ import { join } from 'node:path'
 
 export interface TrackMeta {
   trackUri: string
+  /** Track identity, persisted so picks/retries survive a sidecar restart. */
+  params?: { trackName: string; artistName: string; durationMs: number }
   chosenTabId?: number
-  chosenVideoId?: number | string
-  /** Set when the user must pick a UG version (no Official chart). */
+  chosenVideoId?: string
+  /** Legacy: the pipeline no longer emits UG-version picks (full auto-pick). */
   pendingVersions?: unknown[]
   /** Set when no YouTube candidate scored above threshold. */
   pendingAudio?: unknown[]

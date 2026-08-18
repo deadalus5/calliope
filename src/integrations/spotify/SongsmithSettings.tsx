@@ -1,46 +1,48 @@
 import { useEffect, useState } from 'react'
-import { getSongsmithUrl, setSongsmithUrl, sidecarHealth, type SidecarHealth } from './songsmith-client'
+import { useSidecar } from './sidecar-store'
 
 /**
- * Sidecar hookup: the URL of the songsmith service on the Mac mini, with a
- * live health readout. Machine-local config — deliberately not in backups.
+ * Sidecar hookup: the URL of the songsmith service, with a live health
+ * readout from the shared sidecar store (so saving here immediately un-gates
+ * the auto-chords flow). Machine-local config — deliberately not in backups.
  */
 export function SongsmithSettings({ onClose }: { onClose: () => void }) {
-  const [url, setUrl] = useState(getSongsmithUrl() ?? 'http://127.0.0.1:8765')
-  const [health, setHealth] = useState<SidecarHealth | null | 'checking'>('checking')
-
-  const check = async (candidate: string) => {
-    setHealth('checking')
-    setSongsmithUrl(candidate)
-    setHealth(await sidecarHealth())
-  }
+  const url = useSidecar((s) => s.url)
+  const status = useSidecar((s) => s.status)
+  const health = useSidecar((s) => s.health)
+  const [draft, setDraft] = useState(url ?? 'http://127.0.0.1:8765')
 
   useEffect(() => {
-    if (getSongsmithUrl()) void sidecarHealth().then(setHealth)
-    else setHealth(null)
-  }, [])
+    if (url) void useSidecar.getState().probe()
+  }, [url])
+
+  const save = () => useSidecar.getState().setUrl(draft)
 
   return (
     <div className="panel">
-      <h3>Songsmith (the Mac mini)</h3>
+      <h3>Songsmith</h3>
       <p className="dim">
         Songsmith looks up the chords, hears out the beat, and hands the Jam Room a Song Map.
-        Run <span className="mono">songsmith/setup.sh</span> once on the mini, then <span className="mono">npm start</span>.
+        On the machine that runs it: <span className="mono">cd songsmith && ./setup.sh</span> once,
+        then <span className="mono">npm start</span> (or <span className="mono">./install-launchd.sh</span> to keep it running).
       </p>
       <div className="controls">
         <input
           className="spotify-input mono"
           placeholder="http://127.0.0.1:8765"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void check(url) }}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save() }}
         />
-        <button className="primary" onClick={() => void check(url)}>save & check</button>
+        <button className="primary" onClick={save}>save & check</button>
         <button onClick={onClose}>done</button>
       </div>
-      {health === 'checking' && <p className="dim">checking…</p>}
-      {health === null && <p className="dim">✗ not reachable — cached songs still work; new songs fall back to hand-tapped charts</p>}
-      {health !== null && health !== 'checking' && (
+      {status === 'checking' && <p className="dim">checking…</p>}
+      {status === 'offline' && (
+        <p className="dim">✗ not reachable — cached songs still work; new songs fall back to hand-tapped charts</p>
+      )}
+      {status === 'unknown' && !url && <p className="dim">no sidecar configured yet</p>}
+      {status === 'ok' && health && (
         <p className="dim">
           ✓ connected · yt-dlp {health.ytdlpVersion ?? 'MISSING'} · analyzer {health.analyzerOk ? 'ready' : 'NOT INSTALLED (run setup.sh)'}
           · UG cookie {health.ugCookie ? 'set (Official charts on)' : 'not set (community charts)'}

@@ -110,13 +110,32 @@ export function alignSections(analyzer: AnalyzerResult, ugSections: UgSection[])
 
 // --- chord distribution ----------------------------------------------------------
 
+/**
+ * Nearest index into a sorted ms array within tolMs, else -1. Downbeats and
+ * beats come from the analyzer as separate float lists — matching them by
+ * exact ms equality only works while both happen to round identically, so
+ * the lookup is tolerant by design.
+ */
+export function nearestBeatIndex(beatsMs: number[], ms: number, tolMs = 40): number {
+  if (beatsMs.length === 0) return -1
+  let lo = 0
+  let hi = beatsMs.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (beatsMs[mid] < ms) lo = mid + 1
+    else hi = mid
+  }
+  const best = lo > 0 && Math.abs(beatsMs[lo - 1] - ms) <= Math.abs(beatsMs[lo] - ms) ? lo - 1 : lo
+  return Math.abs(beatsMs[best] - ms) <= tolMs ? best : -1
+}
+
 /** Beat indices of downbeats inside [startMs, endMs). */
-function downbeatsWithin(analyzer: AnalyzerResult, beatIndexOfMs: Map<number, number>, startMs: number, endMs: number): number[] {
+function downbeatsWithin(analyzer: AnalyzerResult, startMs: number, endMs: number): number[] {
   const out: number[] = []
   for (const ms of analyzer.downbeatsMs) {
     if (ms >= startMs && ms < endMs) {
-      const idx = beatIndexOfMs.get(ms)
-      if (idx !== undefined) out.push(idx)
+      const idx = nearestBeatIndex(analyzer.beatsMs, ms)
+      if (idx >= 0 && out[out.length - 1] !== idx) out.push(idx)
     }
   }
   return out
@@ -152,11 +171,9 @@ export function fuse(input: FuseInput): SongMap {
 
   // Beat grid bookkeeping.
   const beats = analyzer.beatsMs
-  const beatIndexOfMs = new Map<number, number>()
-  beats.forEach((ms, i) => beatIndexOfMs.set(ms, i))
   const downbeatIndices = analyzer.downbeatsMs
-    .map((ms) => beatIndexOfMs.get(ms))
-    .filter((i): i is number => i !== undefined)
+    .map((ms) => nearestBeatIndex(beats, ms))
+    .filter((i, k, arr) => i >= 0 && arr.indexOf(i) === k)
   const beatsPerBar = Math.max(1, ...analyzer.beatPositions)
 
   // UG sections with no chords inherit the earlier same-kind section's
@@ -182,7 +199,7 @@ export function fuse(input: FuseInput): SongMap {
   // different length than its segment got is worth flagging.
   for (const a of aligned) {
     if (!a.ug || a.ug.chords.length === 0) continue
-    const bars = downbeatsWithin(analyzer, beatIndexOfMs, a.startMs, a.endMs).length
+    const bars = downbeatsWithin(analyzer, a.startMs, a.endMs).length
     if (bars > 0 && a.ug.chords.length > bars * beatsPerBar) {
       warnings.push(`"${a.ug.label}" has more chords (${a.ug.chords.length}) than beats in its segment — chords compressed`)
     }
@@ -215,7 +232,7 @@ export function fuse(input: FuseInput): SongMap {
   const chords: SongMapChord[] = []
   aligned.forEach((a, i) => {
     if (!a.ug || a.ug.chords.length === 0) return
-    let slots = downbeatsWithin(analyzer, beatIndexOfMs, a.startMs, a.endMs)
+    let slots = downbeatsWithin(analyzer, a.startMs, a.endMs)
     if (a.ug.chords.length > slots.length) {
       // More chords than bars — use every beat in the segment instead.
       slots = []

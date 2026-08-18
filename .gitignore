@@ -9,3 +9,6 @@ songsmith/config.json
 .DS_Store
 .superpowers/
 calliope-upgrade-plan.md
+songsmith/logs
+songsmith/setup.log
+songsmith/.cxx-wrap.sh

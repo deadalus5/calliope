@@ -4,7 +4,9 @@ import { chordToneLayer, modeColorLayer, skeletonLayer } from '../../fretboard/b
 import type { FretboardLayer } from '../../fretboard/layers'
 import { SectionStrip } from './SectionStrip'
 import { SongMapGrid } from './SongMapGrid'
+import { VersionPicker } from './VersionPicker'
 import { loadCorrections } from './songmap-store'
+import { listVersions, type UgVersionChoice } from './songsmith-client'
 import { degreeLabel, modeById, parseChordSymbol, pcName } from './spotify-utils'
 import type { SongKey, SongMap, UserCorrections } from './songmap'
 import { useSongMapPlayhead } from './use-songmap-playhead'
@@ -26,9 +28,23 @@ function keyHeadline(key: SongKey): string {
   }
 }
 
-export function SongMapFollower({ map, onRedo }: { map: SongMap; onRedo: () => void }) {
+export function SongMapFollower({ map, onRedo, onPickTab }: {
+  map: SongMap
+  onRedo: () => void
+  /** Re-pick the UG chart (keeps the audio/analysis cache). */
+  onPickTab?: (tabId: number) => void
+}) {
   const [corrections, setCorrections] = useState<UserCorrections | null>(null)
   const [showProvenance, setShowProvenance] = useState(false)
+  const [versions, setVersions] = useState<UgVersionChoice[] | null>(null)
+  const [loadingVersions, setLoadingVersions] = useState(false)
+
+  const openVersions = async () => {
+    setLoadingVersions(true)
+    const v = await listVersions({ artistName: map.artistName, trackName: map.trackName })
+    setLoadingVersions(false)
+    setVersions(v ?? [])
+  }
 
   useEffect(() => {
     let alive = true
@@ -69,8 +85,35 @@ export function SongMapFollower({ map, onRedo }: { map: SongMap; onRedo: () => v
         <button className="songmap-provbtn" onClick={() => setShowProvenance((v) => !v)}>
           {showProvenance ? 'hide source' : 'source'}
         </button>
+        {onPickTab && (
+          <button
+            className="songmap-changechart"
+            disabled={loadingVersions}
+            onClick={() => (versions ? setVersions(null) : void openVersions())}
+          >
+            {loadingVersions ? 'looking…' : 'change chart'}
+          </button>
+        )}
         <button onClick={onRedo}>redo this song</button>
       </div>
+
+      {versions && (
+        versions.length === 0
+          ? <p className="dim">couldn't list UG versions right now — is songsmith up?</p>
+          : (
+            <>
+              <VersionPicker
+                versions={versions}
+                currentTabId={map.provenance.ug.tabId}
+                onPickTab={(tabId) => { setVersions(null); onPickTab?.(tabId) }}
+                onPickUrl={() => {}}
+              />
+              <div className="controls">
+                <button onClick={() => setVersions(null)}>never mind</button>
+              </div>
+            </>
+          )
+      )}
 
       {showProvenance && (
         <p className="dim songmap-provenance">
