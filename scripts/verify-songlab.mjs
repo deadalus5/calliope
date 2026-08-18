@@ -31,7 +31,9 @@ await page.addInitScript(() => {
 await page.goto('http://127.0.0.1:5173')
 await page.click('button:has-text("Pick up the guitar")')
 await page.click('button:has-text("Song Lab")')
-await page.click('button:has-text("play")')
+// Scoped: a bare button:has-text("play") substring-matches the always-visible
+// "Playground" nav button first (nav renders above the view).
+await page.click('button.primary:has-text("play")')
 
 // Poll chord text + peakDb + accumulating chordEvents together: 250ms
 // cadence, up to 30s, stop once we've seen >=3 distinct chords AND

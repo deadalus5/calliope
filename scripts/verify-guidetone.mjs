@@ -79,7 +79,9 @@ for (let i = 0; i < 30; i++) {
 if (!(await page.evaluate(() => !!globalThis.__fakeToneCtx))) await fail('guide-tone toggle never grabbed the mic')
 await page.evaluate(() => globalThis.__fakeToneCtx?.resume())
 
-await page.click('button:has-text("play")')
+// Scoped: a bare button:has-text("play") substring-matches the always-visible
+// "Playground" nav button first (nav renders above the view).
+await page.click('button.primary:has-text("play")')
 
 // Poll Dexie until at least 3 'chordtone'/'guide' attempts have logged (i.e.
 // several answer windows have resolved), or give up after a generous budget.
