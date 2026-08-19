@@ -146,6 +146,13 @@
 .songmap-chipwrap { display: inline-flex; align-items: center; gap: 2px; }
 .songmap-nudge { font-size: 11px; padding: 4px 6px; }
 
+/* --- guide tones over the record --- */
+
+.songmap-guidebtn.active { border-color: var(--gold); color: var(--gold); background: #33290f; }
+.songmap-guidehud { align-items: baseline; font-size: 14px; }
+.songmap-guideresult.hit { color: var(--good); }
+.songmap-guideresult.miss { color: var(--ink-dim); }
+
 /* --- practice deck --- */
 
 .songmap-modepanel { padding-top: 10px; padding-bottom: 10px; }

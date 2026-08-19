@@ -14,7 +14,8 @@ import { degreeColor } from '../../fretboard/palette'
 import { useBoardPrefs } from '../../state/board-prefs'
 import { useAppPrefs } from '../../state/app-prefs'
 import { MixerStrip } from './MixerStrip'
-import { useGuideToneDrill } from './use-guide-tone-drill'
+import { sequencerTimelineSource } from '../../audio/timeline-source'
+import { useGuideToneDrill } from '../../drills/engine/use-guide-tone-drill'
 import './songlab.css'
 
 /** A/B loop selection in form-space bars: `a` set, `b` pending until the second click. */
@@ -44,7 +45,11 @@ export function SongLabView() {
   const countIn = useAppPrefs((s) => s.countIn)
   const setCountIn = useAppPrefs((s) => s.setCountIn)
   const micMode = useAppPrefs((s) => s.micMode)
-  const guideTone = useGuideToneDrill(key)
+  const guideTone = useGuideToneDrill({
+    source: sequencerTimelineSource,
+    keyFor: () => key,
+    detail: 'guide',
+  })
   useWakeLock(playing)
 
   const prog = useMemo(() => progressionById(progId), [progId])

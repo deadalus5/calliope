@@ -11,6 +11,7 @@ import {
   seekMs, togglePlay, type PlayerState, type TrackHit,
 } from './player'
 import { deck } from '../../audio/deck'
+import { duckBacking, unduckBacking } from '../../audio/instruments'
 import { chartFor, deleteChart, entryAt, saveChart, type TrackChart } from './charts'
 import { PracticeDeck } from './PracticeDeck'
 import { SongLibrary } from './SongLibrary'
@@ -233,6 +234,17 @@ function JamRoom({ player }: { player: PlayerState }) {
     clockMs: () => deck.positionMs(),
     seek: (ms: number) => deck.seek(ms),
     nativeLoop: { set: (a: number, b: number) => deck.setLoop(a, b), clear: () => deck.clearLoop() },
+    drill: {
+      // The deck runs on ctx.currentTime — the mic's own clock — so drill
+      // scoring over its audio is exact, and its bus rides the mixer's duck.
+      ctxTimeOf: (ms: number) => deck.ctxTimeOf(ms),
+      playing: () => deck.playing,
+      rate: () => deck.rate,
+      extraGeneration: () => deck.generation,
+      duck: duckBacking,
+      unduck: unduckBacking,
+      detail: 'guide-deck',
+    },
   }), [])
 
   const sidecarConfigured = Boolean(sidecarUrl)

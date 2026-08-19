@@ -103,6 +103,17 @@ export function estimatePositionMs(): number {
   return lastState.positionMs + (performance.now() - lastPollAt)
 }
 
+export function isPlaying(): boolean {
+  return lastState.connected && !lastState.paused && lastState.trackUri !== null
+}
+
+/** The volume the player connects at — drill ducking restores to this. */
+export const JAM_VOLUME = 0.9
+
+export function setPlayerVolume(v: number): void {
+  void player?.setVolume(v)
+}
+
 export function onPlayerState(l: StateListener): () => void {
   listeners.add(l)
   l(lastState)
