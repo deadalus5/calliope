@@ -162,6 +162,29 @@ export async function probeAudio(trackUri: string): Promise<boolean> {
   }
 }
 
+export interface LyricsDoc {
+  synced: string | null
+  plain: string | null
+}
+
+/** Synced lyrics via the sidecar's LRCLIB cache. Null on any failure. */
+export async function fetchLyricsDoc(params: TrackParams): Promise<LyricsDoc | null> {
+  const q = new URLSearchParams({
+    uri: params.trackUri,
+    artist: params.artistName,
+    title: params.trackName,
+    durationMs: String(Math.round(params.durationMs)),
+  })
+  const raw = await call(`/lyrics?${q}`)
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  if ('offline' in r || 'message' in r) return null
+  return {
+    synced: typeof r.synced === 'string' ? r.synced : null,
+    plain: typeof r.plain === 'string' ? r.plain : null,
+  }
+}
+
 /** Chroma-refine an already-analyzed song ("tighten timing"). */
 export async function requestRefine(params: TrackParams): Promise<SongmapStatus> {
   return toStatus(await call('/refine', {

@@ -7,6 +7,7 @@ import { analyzerVersion } from './analyze'
 import { TrackCache } from './cache'
 import { loadConfig } from './config'
 import { JobRunner, type Stage } from './jobs'
+import { fetchLyrics } from './lyrics'
 import { versionScore } from './pick'
 import { ensureRateRender, parseRange, quantizeRate } from './serve-audio'
 import { searchUg } from './ug'
@@ -87,6 +88,24 @@ app.post('/pick', async (c) => {
   const body = await c.req.json<{ uri?: string; tabId?: number; youtubeUrl?: string }>()
   if (!body.uri) return c.json({ message: 'missing uri' }, 400)
   return c.json(jobs.pick(body.uri, { tabId: body.tabId, youtubeUrl: body.youtubeUrl }))
+})
+
+// Synced lyrics (LRCLIB), cache-first — fetched here so the app never
+// fights CORS; runs outside the job queue (milliseconds, not minutes).
+app.get('/lyrics', async (c) => {
+  const uri = c.req.query('uri')
+  const artist = c.req.query('artist')
+  const title = c.req.query('title')
+  const durationMs = Number(c.req.query('durationMs'))
+  if (!uri || !artist || !title || !Number.isFinite(durationMs)) {
+    return c.json({ message: 'missing uri/artist/title/durationMs' }, 400)
+  }
+  const cache = new TrackCache(config.cacheDir, uri)
+  const cached = cache.readJson<object>('lyrics.json')
+  if (cached) return c.json(cached)
+  const doc = await fetchLyrics({ artistName: artist, trackName: title, durationMs })
+  cache.writeJson('lyrics.json', doc)
+  return c.json(doc)
 })
 
 // The practice deck's audio: cached analysis download, atempo renders per

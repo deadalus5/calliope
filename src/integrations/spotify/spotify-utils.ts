@@ -3,8 +3,8 @@
  * the integration keeps a single, thin dependency surface.
  */
 export {
-  PC, degreeLabel, degreeOf, modeById, parseChordSymbol, pcName,
-  type Chord, type ModeSpec, type PitchClass,
+  PC, coordToMidi, coordToPc, degreeLabel, degreeOf, modeById, parseChordSymbol, pcName,
+  type Chord, type ChordShape, type FretCoord, type ModeSpec, type PitchClass,
 } from '../../music-core'
 import { PC, degreeLabel, modeById, pcName, type PitchClass } from '../../music-core'
 import type { SongKey } from './songmap'

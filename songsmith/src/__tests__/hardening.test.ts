@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { autoPickTab, type FetchedTab } from '../pick'
 import { statusFromDisk } from '../status'
 import { fuse, nearestBeatIndex, type FuseInput } from '../fuse'
+import { parseTabPage } from '../ug-parse'
 import type { AnalyzerResult, UgVersionInfo } from '../types'
 import type { SongMap } from '../../../src/integrations/spotify/songmap'
 
@@ -110,6 +111,27 @@ describe('nearestBeatIndex', () => {
   it('picks the nearer neighbor at boundaries', () => {
     expect(nearestBeatIndex(beats, 260, 250)).toBe(1)
     expect(nearestBeatIndex(beats, 240, 250)).toBe(0)
+  })
+})
+
+describe('applicature capo fallback (no notes array)', () => {
+  it('flips high-e-first frets to low→high and sounds them at the capo', () => {
+    const store = {
+      store: { page: { data: {
+        tab: { id: 42, tonality_name: 'Am', type: 'Chords' },
+        tab_view: {
+          meta: { capo: 2 },
+          wiki_tab: { content: '[Verse 1]\n[ch]Am[/ch] [ch]D[/ch]' },
+          // High-e-first x02210 (Am shape), NO notes — the fallback path.
+          applicature: { Am: [{ frets: [0, 1, 2, 2, 0, -1], fret: 1 }] },
+        },
+      } } },
+    }
+    const chart = parseTabPage(store, 'https://ug/x')
+    // Capo 2: the written Am sounds as Bm; open strings ring at the capo.
+    expect(chart.voicings?.Bm).toBeDefined()
+    expect(chart.voicings!.Bm[0].frets).toEqual([-1, 2, 4, 4, 3, 2])
+    expect(chart.voicings!.Bm[0].baseFret).toBe(2)
   })
 })
 

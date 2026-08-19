@@ -161,6 +161,27 @@
 .songmap-deckbpm { font-size: 14px; }
 .songmap-deckpos { font-size: 13px; }
 
+/* --- grips + lyrics --- */
+
+.songmap-gripbtn.active, .songmap-lyricsbtn.active { border-color: var(--gold); color: var(--gold); background: #33290f; }
+.songmap-gripcontrols { display: inline-flex; align-items: center; gap: 6px; }
+.songmap-griplink { font-size: 12px; }
+
+.songmap-lyrics {
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 10px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.songmap-lyricline { position: relative; padding: 14px 0 2px; color: var(--ink-dim); }
+.songmap-lyricline.active { color: var(--gold); }
+.songmap-lyricchords { position: absolute; top: 0; left: 0; right: 0; height: 14px; font-size: 11px; }
+.songmap-lyricchords span { position: absolute; top: 0; color: var(--ember, #d08850); }
+.songmap-lyrictext { font-size: 14px; line-height: 1.35; }
+.songmap-lyricsplain { max-height: 240px; overflow-y: auto; font-size: 13px; white-space: pre-wrap; }
+
 /* --- learned-song library --- */
 
 .songmap-librows { display: flex; flex-direction: column; gap: 6px; }

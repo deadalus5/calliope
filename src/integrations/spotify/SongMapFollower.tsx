@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Fretboard } from '../../fretboard/Fretboard'
-import { chordToneLayer, modeColorLayer, skeletonLayer, targetLayer } from '../../fretboard/build-layers'
+import { chordShapeLayer, chordToneLayer, modeColorLayer, skeletonLayer, targetLayer } from '../../fretboard/build-layers'
 import type { FretboardLayer } from '../../fretboard/layers'
 import { audioNow, silentTimelineSource } from '../../audio/timeline-source'
 import { useGuideToneDrill } from '../../drills/engine/use-guide-tone-drill'
 import { useAppPrefs } from '../../state/app-prefs'
+import { useChordLink } from '../../state/chord-link'
 import { CorrectionBar } from './CorrectionBar'
+import { LyricsPanel } from './LyricsPanel'
 import { SectionStrip } from './SectionStrip'
 import { SongMapGrid } from './SongMapGrid'
 import { VersionPicker } from './VersionPicker'
+import { parseLrc, placeChords, type LrcLine } from './lrc'
 import { estimatePositionMs, isPlaying, JAM_VOLUME, seekMs, setPlayerVolume } from './player'
 import { songMapTimelineSource } from './songmap-source'
-import { listVersions, type UgVersionChoice } from './songsmith-client'
+import { fetchLyricsDoc, listVersions, type UgVersionChoice } from './songsmith-client'
 import { keyHeadline, modeById, parseChordSymbol } from './spotify-utils'
+import { ugVoicingToShape } from './voicing-render'
 import type { SongKey, SongMap } from './songmap'
 import { useCorrections } from './use-corrections'
 import { useSectionLoop } from './use-section-loop'
@@ -134,6 +138,28 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }:
     setVersions(v ?? [])
   }
 
+  // --- The chart's own grips (UG applicature) ------------------------------
+  const [showGrips, setShowGrips] = useState(false)
+  const [gripVariant, setGripVariant] = useState(0)
+  const hasVoicings = Boolean(map.voicings && Object.keys(map.voicings).length > 0)
+
+  // --- Chords over lyrics --------------------------------------------------
+  const [showLyrics, setShowLyrics] = useState(false)
+  const [lyrics, setLyrics] = useState<{ lines: LrcLine[]; plain: string | null } | 'miss' | null>(null)
+  useEffect(() => { setLyrics(null); setShowLyrics(false) }, [map.trackUri])
+  useEffect(() => {
+    if (!showLyrics || lyrics !== null) return
+    let alive = true
+    void fetchLyricsDoc({
+      trackUri: map.trackUri, trackName: map.trackName, artistName: map.artistName, durationMs: map.durationMs,
+    }).then((doc) => {
+      if (!alive) return
+      if (!doc || (!doc.synced && !doc.plain)) { setLyrics('miss'); return }
+      setLyrics({ lines: doc.synced ? parseLrc(doc.synced) : [], plain: doc.plain })
+    })
+    return () => { alive = false }
+  }, [showLyrics, lyrics, map])
+
   // The key can change per section (modulating bridges swap all three layers).
   const activeKey: SongKey = (playhead.sectionIndex >= 0 && map.sections[playhead.sectionIndex].keyOverride) || map.key
 
@@ -144,21 +170,43 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }:
     [map, activeKey.root],
   )
 
+  const currentSymbol = playhead.chordIndex >= 0 ? map.chords[playhead.chordIndex].symbol : '—'
+  const nextSymbol = playhead.nextChordIndex >= 0 ? map.chords[playhead.nextChordIndex].symbol : null
+  const warnings = map.provenance.fusion.warnings
+
+  // Reset the grip variant whenever the sounding chord changes.
+  useEffect(() => { setGripVariant(0) }, [currentSymbol])
+  const currentVoicings = currentSymbol !== '—' ? map.voicings?.[currentSymbol] : undefined
+  const gripShape = useMemo(() => {
+    if (!showGrips || !currentVoicings?.length) return null
+    return ugVoicingToShape(currentSymbol, currentVoicings[gripVariant % currentVoicings.length])
+  }, [showGrips, currentVoicings, gripVariant, currentSymbol])
+
   const layers = useMemo(() => {
     const out: FretboardLayer[] = [skeletonLayer(activeKey.root, activeKey.skeleton, 'all')]
-    try { out.push(modeColorLayer(activeKey.root, modeById(activeKey.modeId))) } catch { /* skeleton only */ }
-    if (playhead.chordIndex >= 0 && chordLayers[playhead.chordIndex]) {
-      out.push(chordLayers[playhead.chordIndex]!)
+    if (gripShape) {
+      // Grip view: the chart author's actual fingering over the dim
+      // skeleton — chord-tone and mode-color layers step aside so the grip
+      // reads as THE thing to play.
+      out.push(chordShapeLayer(gripShape, 'ug-grip'))
+    } else {
+      try { out.push(modeColorLayer(activeKey.root, modeById(activeKey.modeId))) } catch { /* skeleton only */ }
+      if (playhead.chordIndex >= 0 && chordLayers[playhead.chordIndex]) {
+        out.push(chordLayers[playhead.chordIndex]!)
+      }
     }
     if (guide.active && guide.upcoming) {
       out.push(targetLayer(guide.upcoming.targetPc, activeKey.root, true))
     }
     return out
-  }, [activeKey, playhead.chordIndex, chordLayers, guide.active, guide.upcoming])
+  }, [activeKey, playhead.chordIndex, chordLayers, guide.active, guide.upcoming, gripShape])
 
-  const currentSymbol = playhead.chordIndex >= 0 ? map.chords[playhead.chordIndex].symbol : '—'
-  const nextSymbol = playhead.nextChordIndex >= 0 ? map.chords[playhead.nextChordIndex].symbol : null
-  const warnings = map.provenance.fusion.warnings
+  const placedLyricChords = useMemo(
+    () => (lyrics !== null && lyrics !== 'miss' && lyrics.lines.length > 0
+      ? placeChords(lyrics.lines, resolved, map)
+      : null),
+    [lyrics, resolved, map],
+  )
 
   return (
     <div className="panel">
@@ -183,6 +231,22 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }:
             guide tones
           </button>
         )}
+        {hasVoicings && (
+          <button
+            className={`songmap-gripbtn${showGrips ? ' active' : ''}`}
+            onClick={() => setShowGrips((v) => !v)}
+            title="show the chart author's actual fingering for the sounding chord"
+          >
+            grips
+          </button>
+        )}
+        <button
+          className={`songmap-lyricsbtn${showLyrics ? ' active' : ''}`}
+          disabled={lyrics === 'miss'}
+          onClick={() => setShowLyrics((v) => !v)}
+        >
+          {lyrics === 'miss' ? 'no lyrics found' : 'lyrics'}
+        </button>
         {onPickTab && (
           <button
             className="songmap-changechart"
@@ -255,6 +319,26 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }:
 
       <div className="controls songmap-nowline">
         <span className="songlab-chord">{currentSymbol}</span>
+        {gripShape && currentVoicings && (
+          <span className="songmap-gripcontrols">
+            {currentVoicings.length > 1 && (
+              <>
+                <button onClick={() => setGripVariant((v) => (v + currentVoicings.length - 1) % currentVoicings.length)}>‹</button>
+                <span className="dim mono">{(gripVariant % currentVoicings.length) + 1}/{currentVoicings.length}</span>
+                <button onClick={() => setGripVariant((v) => (v + 1) % currentVoicings.length)}>›</button>
+              </>
+            )}
+            <button
+              className="songmap-griplink"
+              onClick={() => useChordLink.getState().send({
+                target: 'chordlib', root: gripShape.root, qualityId: gripShape.qualityId, coords: gripShape.coords,
+              })}
+              title="study this grip in the Chord Library"
+            >
+              open in library
+            </button>
+          </span>
+        )}
         {nextSymbol && (
           <span className="songmap-next">
             <span className="dim">then</span> {nextSymbol}
@@ -291,6 +375,15 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }:
         nudgeMode={fixTiming}
         onNudge={nudge}
       />
+
+      {showLyrics && lyrics !== null && lyrics !== 'miss' && (
+        lyrics.lines.length > 0 && placedLyricChords
+          ? <LyricsPanel lines={lyrics.lines} placed={placedLyricChords} clockMs={t.clockMs} />
+          : lyrics.plain
+            ? <pre className="songmap-lyricsplain dim">{lyrics.plain}</pre>
+            : null
+      )}
+      {showLyrics && lyrics === null && <p className="dim">finding the words…</p>}
 
       <Fretboard layers={layers} keyRoot={activeKey.root} />
     </div>

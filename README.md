@@ -52,7 +52,7 @@ where they're always shown.
 | **Chord Finder** | Tap notes on the board, one per string, and the name updates with every tap: G → G5 → Gsus2 as the notes land. Alternate readings (Dsus4/G…), slash basses, missing-5th and added-color commentary — and one tap sends the chord to the Library for easier shapes. |
 | **Modal Colors** | Each mode as a vamp in the style of a song you know, A/B licks with and without the color notes, then mic-verified color hunts. |
 | **Song Lab** | The band plays changes you know (Mayer, Dead, blues forms) while the fretboard names what your hands already follow. Loop, transpose, slow down. |
-| **Jam Room** | The real recordings via Spotify, following an auto-built **Song Map**: chords looked up on Ultimate Guitar, key + mode inferred and shown as skeleton + colors, sections and beat grid heard from the audio. Click a section (V1, CH1, SOLO) to jump the record there; the grid and fretboard follow, with a countdown to the next change. Hand-tapped charts remain as the no-sidecar fallback. |
+| **Jam Room** | The real recordings via Spotify, following an auto-built **Song Map**: chords looked up on Ultimate Guitar (best version auto-picked, one click to change), key + mode inferred and shown as skeleton + colors — the record itself gets a vote — sections and beat grid heard from the audio, timing tightened on demand by chroma analysis. Click a section (V1, CH1, SOLO) to jump the record there, ⟳ to loop it; the grid and fretboard follow with a countdown to the next change. Fix timing by tapping ("the change is NOW") — corrections stick per-section and survive redoing the song. A **practice deck** plays songsmith's copy of the record through the app: slow it to a target BPM (pitch intact), loop a section beat-tight, and run the **guide-tone drill** over the real record (mic-scored, record ducks in your answer window). Learned songs live in a library — open the Jam Room and your repertoire is just there. Synced **lyrics with the chords over the words**, and the chart's own **grips** on the fretboard, one tap from the Chord Library. Hand-tapped charts remain as the no-sidecar fallback. |
 | **Dark Spots** | Accuracy per degree × key from every drill — the honest map of what needs work. |
 
 ## Jam Room (Spotify) setup — one time
@@ -101,6 +101,9 @@ node scripts/verify-songlab.mjs    # E2E: band timing/clipping checks; --bounce 
 node scripts/verify-nomic.mjs      # E2E: no-mic mode, tap answers, zero mic requests
 node scripts/verify-guidetone.mjs  # E2E: Song Lab guide-tone drill
 node scripts/verify-jamroom.mjs    # E2E: Song Map Jam Room (stubbed Spotify SDK + fixture sidecar)
+node scripts/verify-corrections.mjs # E2E: Tap 2.0 corrections, section loop, learned-song library
+node scripts/verify-deck.mjs       # E2E: practice deck (BPM slow-down, native loops, deck clock)
+node scripts/verify-jamdrill.mjs   # E2E: guide-tone drill over the record (synthetic mic)
 node scripts/verify-chords.mjs     # E2E: Chord Library + Finder (anchoring, naming flow, handoff)
 node scripts/verify-playground.mjs # E2E: Playground layers, overlap styles, shape library, persistence
 ```

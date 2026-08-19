@@ -176,6 +176,23 @@ function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
 }
 
+/** Standard-tuning open-string MIDI, low E → high e. */
+const OPEN_MIDI = [40, 45, 50, 55, 59, 64]
+/** UG's applicature `notes` are MIDI − 12 (verified against real charts:
+ * G low-E 3rd fret = MIDI 43 arrives as 31). */
+const UG_NOTE_OFFSET = 12
+
+/** Absolute sounding frets (low→high) from the voicing's `notes` — immune
+ * to UG's base-fret conventions. Null when notes are absent/implausible. */
+function absoluteFretsFromNotes(v: unknown): number[] | null {
+  const notes = get(v, ['notes'])
+  if (!Array.isArray(notes) || notes.length !== 6 || !notes.every((n) => typeof n === 'number')) return null
+  // UG lists strings high-e first; flip to the app's low→high convention.
+  const lowFirst = [...(notes as number[])].reverse()
+  const frets = lowFirst.map((n, i) => (n < 0 ? -1 : n + UG_NOTE_OFFSET - OPEN_MIDI[i]))
+  return frets.every((f) => f === -1 || (f >= 0 && f <= 24)) ? frets : null
+}
+
 function parseApplicature(raw: unknown, capo: number): Record<string, UgVoicing[]> | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
   const out: Record<string, UgVoicing[]> = {}
@@ -183,9 +200,17 @@ function parseApplicature(raw: unknown, capo: number): Record<string, UgVoicing[
     if (!Array.isArray(variants)) continue
     const voicings: UgVoicing[] = []
     for (const v of variants) {
-      const frets = get(v, ['frets'])
-      if (!Array.isArray(frets) || !frets.every((f) => typeof f === 'number')) continue
-      voicings.push({ frets: frets as number[], baseFret: num(get(v, ['fret']), 1) })
+      let frets = absoluteFretsFromNotes(v)
+      if (!frets) {
+        const rawFrets = get(v, ['frets'])
+        if (!Array.isArray(rawFrets) || rawFrets.length !== 6 || !rawFrets.every((f) => typeof f === 'number')) continue
+        // Fallback path: flip high-e-first to low→high and add the capo —
+        // the symbol keys are transposed to concert pitch, so the frets
+        // must sound in concert too (an open string rings AT the capo).
+        frets = [...(rawFrets as number[])].reverse().map((f) => (f < 0 ? -1 : f + capo))
+      }
+      const fretted = frets.filter((f) => f > 0)
+      voicings.push({ frets, baseFret: fretted.length > 0 ? Math.min(...fretted) : 1 })
     }
     if (voicings.length > 0) out[transposeSymbol(normalizeUgSymbol(symbol), capo)] = voicings
   }
