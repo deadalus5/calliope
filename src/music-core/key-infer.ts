@@ -70,6 +70,16 @@ const EXOTIC_MODES = new Set(['lydian', 'phrygian'])
  * is; disagreeing means neither deserves much weight (trust drops to 25%).
  */
 const AUDIO_KEY_BONUS_BEATS = 96
+/** Corroborated priors must scale WITH the evidence mass, or a long chart
+ * of turnaround dominants out-arithmetics them (Superstition: 331 beats of
+ * B7 stabs vs a fixed bonus). Fraction of total input weight added per
+ * unit of chroma strength when sheet and record agree on the root. */
+const CORROBORATION_WEIGHT = 0.6
+/** Colors must EARN their place: any non-plain mode (plain = ionian/
+ * aeolian for its skeleton) must beat the plain sibling on the same root
+ * by this margin, or the plain hearing wins — b2s and #4s from passing
+ * dominants shouldn't repaint his board. */
+const PLAIN_MODE_MARGIN = 0.92
 
 /** Parse 'Am' / 'Bb' / 'F#m' into a concert-pitch root + minor flag. */
 export function parseTonality(name: string, capo = 0): { root: PitchClass; minor: boolean } | null {
@@ -140,6 +150,27 @@ export function fitScore(input: KeyInferInput, root: PitchClass, mode: ModeSpec)
   return fit + bonus * meanFit
 }
 
+/** The chord that DEFINES each colored mode, rooted at a scale degree with
+ * a major third: hearing it written is what licenses the mode call. */
+const CHARACTERISTIC_CHORD_DEGREE: Record<string, number> = {
+  mixolydian: 10, // the bVII major chord (or see tonic-dom7 below)
+  dorian: 5,      // the IV major chord in a minor context
+  phrygian: 1,    // a bII major chord
+  lydian: 2,      // a II major chord (carries the #4)
+}
+
+function hasCharacteristicChord(input: KeyInferInput, root: PitchClass, modeId: string): boolean {
+  const degree = CHARACTERISTIC_CHORD_DEGREE[modeId]
+  if (degree === undefined) return false
+  for (const wc of input.chords) {
+    const d = degreeOf(wc.chord.root, root)
+    if (d === degree && wc.chord.quality.intervals.includes(4)) return true
+    // A dominant-7 tonic is mixolydian in its own right (the A7 vamp).
+    if (modeId === 'mixolydian' && d === 0 && wc.chord.quality.intervals.includes(10)) return true
+  }
+  return false
+}
+
 /**
  * Best root × ModeSpec for a chord list. Confidence reflects the margin over
  * the best differently-rooted candidate (mode siblings on the same root are
@@ -147,8 +178,10 @@ export function fitScore(input: KeyInferInput, root: PitchClass, mode: ModeSpec)
  */
 export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyResult {
   const hint = hints?.tonalityName ? parseTonality(hints.tonalityName, hints.capo ?? 0) : null
+  const totalWeight = input.chords.reduce((s, c) => s + c.weightBeats, 0)
   let best: { root: PitchClass; mode: ModeSpec; score: number } | null = null
   const bestPerRoot = new Map<PitchClass, number>()
+  const scoreOf = new Map<string, number>()
 
   for (let root = 0 as PitchClass; root < 12; root++) {
     for (const mode of MODES) {
@@ -164,15 +197,16 @@ export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyRe
         if (hint && hint.root === audio.root) {
           // The sheet's editor and the record itself AGREE on the root —
           // two independent sensors corroborating is near-ground-truth, no
-          // matter how few chords the chart bothers to write (a riff chart
-          // like Superstition writes only turnaround dominants).
-          score += AUDIO_KEY_BONUS_BEATS * audio.strength
+          // matter how few (or how skewed) the chart's written chords are;
+          // the bonus scales with the evidence mass it must out-vote.
+          score += audio.strength * (AUDIO_KEY_BONUS_BEATS + CORROBORATION_WEIGHT * totalWeight)
         } else {
           const sparsity = Math.max(0.15, 1 - Math.min(1, hints?.chordCoverage ?? 1))
           const trust = hint ? 0.25 : 1
           score += AUDIO_KEY_BONUS_BEATS * audio.strength * sparsity * trust
         }
       }
+      scoreOf.set(`${root}:${mode.id}`, score)
       const perRoot = bestPerRoot.get(root)
       if (perRoot === undefined || score > perRoot) bestPerRoot.set(root, score)
       if (!best || score > best.score) best = { root, mode, score }
@@ -180,7 +214,21 @@ export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyRe
   }
 
   // best is always set: MODES is non-empty.
-  const b = best!
+  let b = best!
+  // Colors must earn their place: fall back to the plain mode of the same
+  // skeleton unless the colored hearing clearly beats it — EXCEPT when the
+  // mode's characteristic chord is actually written (a bVII major chord IS
+  // mixolydian; a IV major in minor IS dorian). Without that marker, color
+  // notes are usually passing-dominant artifacts (Superstition's phrygian
+  // b2 came from B7 stabs, not from any bII chord).
+  const plainId = b.mode.skeleton === 'minor' ? 'aeolian' : 'ionian'
+  if (b.mode.id !== plainId && !hasCharacteristicChord(input, b.root, b.mode.id)) {
+    const plainScore = scoreOf.get(`${b.root}:${plainId}`)
+    const plainMode = MODES.find((m) => m.id === plainId)
+    if (plainMode && plainScore !== undefined && plainScore >= b.score * PLAIN_MODE_MARGIN) {
+      b = { root: b.root, mode: plainMode, score: b.score }
+    }
+  }
   let runnerUp = 0
   for (const [root, score] of bestPerRoot) {
     if (root !== b.root && score > runnerUp) runnerUp = score
