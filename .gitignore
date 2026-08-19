@@ -12,3 +12,6 @@ calliope-upgrade-plan.md
 songsmith/logs
 songsmith/setup.log
 songsmith/.cxx-wrap.sh
+songsmith/demix
+songsmith/spec
+songsmith/*/allin1-work
