@@ -32,6 +32,9 @@ export function useSectionLoop(opts: {
   resolved: ResolvedTiming
   clockMs(): number
   seek(ms: number): void
+  /** Sample-accurate loop points (the deck); when present, the JS watcher
+   * only handles cancel-on-escape — the wrap runs in the audio thread. */
+  native?: { set(aMs: number, bMs: number): void; clear(): void }
   /** Fires on arm/disarm/cancel — the drill layer keys its generation on it. */
   onChange?(loopIndex: number | null): void
 }): { loopIndex: number | null; toggle(sectionIndex: number): void } {
@@ -42,7 +45,10 @@ export function useSectionLoop(opts: {
 
   const setAndNotify = useCallback((next: number | null) => {
     setLoopIndex((cur) => {
-      if (cur !== next) optsRef.current.onChange?.(next)
+      if (cur !== next) {
+        if (next === null) optsRef.current.native?.clear()
+        optsRef.current.onChange?.(next)
+      }
       return next
     })
   }, [])
@@ -55,8 +61,10 @@ export function useSectionLoop(opts: {
       const decision = shouldWrap(
         optsRef.current.clockMs(), sec.startMs, sec.endMs, lastSeekAtRef.current, performance.now())
       if (decision === 'wrap') {
-        lastSeekAtRef.current = performance.now()
-        optsRef.current.seek(Math.max(0, sec.startMs))
+        if (!optsRef.current.native) {
+          lastSeekAtRef.current = performance.now()
+          optsRef.current.seek(Math.max(0, sec.startMs))
+        }
       } else if (decision === 'cancel') {
         setAndNotify(null)
       }
@@ -64,18 +72,32 @@ export function useSectionLoop(opts: {
     return () => clearInterval(timer)
   }, [loopIndex, setAndNotify])
 
+  // Corrections can move an armed loop's bounds (a tap mid-loop): keep the
+  // native loop points in step with the live resolved timing.
+  useEffect(() => {
+    if (loopIndex === null || !opts.native) return
+    const sec = opts.resolved.sections[loopIndex]
+    if (sec) opts.native.set(Math.max(0, sec.startMs), sec.endMs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loopIndex, opts.resolved])
+
   const toggle = useCallback((sectionIndex: number) => {
     setLoopIndex((cur) => {
       const next = cur === sectionIndex ? null : sectionIndex
       if (next !== null) {
         const sec = optsRef.current.resolved.sections[next]
         const pos = optsRef.current.clockMs()
-        // Arm from outside the section: jump in (otherwise the escape
-        // check would cancel the loop on its first tick).
-        if (sec && (pos < sec.startMs || pos > sec.endMs)) {
-          lastSeekAtRef.current = performance.now()
-          optsRef.current.seek(Math.max(0, sec.startMs))
+        if (sec) {
+          optsRef.current.native?.set(Math.max(0, sec.startMs), sec.endMs)
+          // Arm from outside the section: jump in (otherwise the escape
+          // check would cancel the loop on its first tick).
+          if (pos < sec.startMs || pos > sec.endMs) {
+            lastSeekAtRef.current = performance.now()
+            optsRef.current.seek(Math.max(0, sec.startMs))
+          }
         }
+      } else {
+        optsRef.current.native?.clear()
       }
       if (cur !== next) optsRef.current.onChange?.(next)
       return next

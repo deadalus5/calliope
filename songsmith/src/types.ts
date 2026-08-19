@@ -53,6 +53,9 @@ export interface AnalyzerResult {
   /** 1-based position of each beat within its bar; max = beats per bar. */
   beatPositions: number[]
   segments: { startMs: number; endMs: number; label: string }[]
+  /** Audio-measured key prior (py/key_chroma.py) — riff songs whose sheets
+   * barely write chords need the record itself to vote. */
+  chromaKey?: { root: number; minor: boolean; strength: number }
 }
 
 export interface AudioMatch {

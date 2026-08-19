@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { execa } from 'execa'
-import { analyzerVersion, runAnalyzer, toAnalyzerResult } from './analyze'
+import { analyzerVersion, estimateChromaKey, runAnalyzer, toAnalyzerResult } from './analyze'
 import { downloadAudio, MATCH_THRESHOLD, searchCandidates, videoIdFromUrl } from './audio'
 import { TrackCache } from './cache'
 import { PACKAGE_ROOT, type SongsmithConfig } from './config'
@@ -293,6 +293,14 @@ export class JobRunner {
         mkdirSync(outDir, { recursive: true })
         analyzer = await runAnalyzer(this.config, cache.path('audio.m4a'), outDir)
         cache.writeJson('allin1.json', analyzer)
+      }
+      // Chroma key prior (backfills caches analyzed before it existed).
+      if (!analyzer.chromaKey) {
+        const ck = await estimateChromaKey(this.config, cache.path('audio.m4a'))
+        if (ck) {
+          analyzer.chromaKey = ck
+          cache.writeJson('allin1.json', analyzer)
+        }
       }
 
       // --- Stage: fuse -------------------------------------------------------

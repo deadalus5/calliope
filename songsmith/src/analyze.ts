@@ -1,7 +1,7 @@
 import { execa } from 'execa'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SongsmithConfig } from './config'
+import { PACKAGE_ROOT, type SongsmithConfig } from './config'
 import type { AnalyzerResult } from './types'
 
 /**
@@ -38,6 +38,23 @@ export async function analyzerVersion(config: SongsmithConfig): Promise<string> 
     return m ? m[1].trim() : 'unknown'
   } catch {
     return 'unknown'
+  }
+}
+
+/** Audio-measured key prior; a failed estimate is just "no prior" (null). */
+export async function estimateChromaKey(
+  config: SongsmithConfig,
+  audioPath: string,
+): Promise<AnalyzerResult['chromaKey'] | null> {
+  try {
+    const py = join(config.venvDir, 'bin', 'python')
+    const { stdout } = await execa(py, [join(PACKAGE_ROOT, 'py', 'key_chroma.py'), audioPath], { timeout: 120_000 })
+    const lines = stdout.trim().split('\n')
+    const raw = JSON.parse(lines[lines.length - 1]) as { root: number; minor: boolean; strength: number; error?: string }
+    if (raw.error || !Number.isFinite(raw.root) || !Number.isFinite(raw.strength)) return null
+    return { root: raw.root, minor: raw.minor, strength: raw.strength }
+  } catch {
+    return null
   }
 }
 

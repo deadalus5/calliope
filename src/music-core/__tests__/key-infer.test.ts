@@ -99,6 +99,44 @@ describe('inferKey', () => {
   })
 })
 
+describe('audio key prior', () => {
+  it('a sparse dominant-vamp chart falls to the corroborated sheet+audio root (the Superstition case)', () => {
+    // The chart writes only the chorus stabs — chord fit alone hears B. The
+    // sheet says Ebm and the record's chroma agrees on Eb: two independent
+    // sensors agreeing out-vote the stabs (coverage is low; the riff is
+    // never a chord token).
+    const chords = [
+      wc('B7', 8, { start: true }), wc('C7', 4), wc('B7', 8), wc('Bb7', 4),
+      wc('A7', 4), wc('B7', 8, { start: true }), wc('B7', 8, { start: true }),
+    ]
+    const noAudio = inferKey({ chords }, { tonalityName: 'Ebm' })
+    expect(noAudio.root).toBe(PC.B)
+    const withAudio = inferKey({ chords }, {
+      tonalityName: 'Ebm',
+      audioKey: { root: PC.Ds, minor: false, strength: 0.47 },
+      chordCoverage: 0.27,
+    })
+    expect(withAudio.root).toBe(PC.Ds)
+    expect(withAudio.skeleton).toBe('minor')
+  })
+
+  it('an audio prior that contradicts the sheet is distrusted (the Rolling in the Deep case)', () => {
+    // Chroma often hears the dominant on minor-key pop; the sheet disagrees,
+    // so the audio vote shrinks and the chords keep the key.
+    const chords = [
+      wc('Cm', 8, { start: true, end: true }), wc('Gm', 8), wc('Bb', 8),
+      wc('Ab', 8), wc('Cm', 8, { start: true }),
+    ]
+    const r = inferKey({ chords }, {
+      tonalityName: 'Cm',
+      audioKey: { root: PC.G, minor: true, strength: 0.46 },
+      chordCoverage: 0.55,
+    })
+    expect(r.root).toBe(PC.C)
+    expect(r.skeleton).toBe('minor')
+  })
+})
+
 describe('inferSectionKeys', () => {
   it('flags a bridge that clearly modulates and leaves agreeing sections null', () => {
     const whole = inferKey({ chords: [wc('G', 16, { start: true, end: true }), wc('C', 8), wc('D', 8)] })

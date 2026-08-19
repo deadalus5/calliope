@@ -33,6 +33,13 @@ export interface KeyInferHints {
   /** Capo fret from the same sheet. The sheet's shapes sound `capo`
    * semitones higher, so the hinted root is normalized to concert pitch. */
   capo?: number
+  /** Audio-measured key prior (chroma profile correlation). ROOT only —
+   * major/minor from chroma is unreliable on dominant-heavy grooves. */
+  audioKey?: { root: PitchClass; minor: boolean; strength: number } | null
+  /** How much of the song the chart's chords actually cover (0..1). Riff
+   * songs whose sheets only write the chorus stabs sit near 0 — exactly
+   * when the record itself must out-vote the written chords. */
+  chordCoverage?: number
 }
 
 export interface SongKeyResult {
@@ -54,8 +61,15 @@ const HINT_SKELETON_BONUS_BEATS = 3
  * rarer modes pay a small evidence premium so they only win when their
  * color notes actually earn it.
  */
-const EXOTIC_MODE_PENALTY_BEATS = 3
+const EXOTIC_MODE_PENALTY_BEATS = 6
 const EXOTIC_MODES = new Set(['lydian', 'phrygian'])
+/**
+ * Full-size audio root prior, before the strength × sparsity × trust
+ * scaling. Two independent noisy sensors (the sheet's tonality field, the
+ * record's chroma) AGREEING on a root is the strongest key evidence there
+ * is; disagreeing means neither deserves much weight (trust drops to 25%).
+ */
+const AUDIO_KEY_BONUS_BEATS = 96
 
 /** Parse 'Am' / 'Bb' / 'F#m' into a concert-pitch root + minor flag. */
 export function parseTonality(name: string, capo = 0): { root: PitchClass; minor: boolean } | null {
@@ -128,6 +142,12 @@ export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyRe
         score += HINT_BONUS_BEATS
         const hintSkeleton = hint.minor ? 'minor' : 'major'
         if (mode.skeleton === hintSkeleton) score += HINT_SKELETON_BONUS_BEATS
+      }
+      const audio = hints?.audioKey
+      if (audio && audio.root === root) {
+        const sparsity = Math.max(0.15, 1 - Math.min(1, hints?.chordCoverage ?? 1))
+        const trust = !hint || hint.root === audio.root ? 1 : 0.25
+        score += AUDIO_KEY_BONUS_BEATS * audio.strength * sparsity * trust
       }
       const perRoot = bestPerRoot.get(root)
       if (perRoot === undefined || score > perRoot) bestPerRoot.set(root, score)

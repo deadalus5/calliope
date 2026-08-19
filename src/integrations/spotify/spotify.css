@@ -146,6 +146,14 @@
 .songmap-chipwrap { display: inline-flex; align-items: center; gap: 2px; }
 .songmap-nudge { font-size: 11px; padding: 4px 6px; }
 
+/* --- practice deck --- */
+
+.songmap-modepanel { padding-top: 10px; padding-bottom: 10px; }
+.songmap-deck { margin-top: 8px; align-items: center; }
+.songmap-deckplay { font-size: 15px; padding: 8px 18px; }
+.songmap-deckbpm { font-size: 14px; }
+.songmap-deckpos { font-size: 13px; }
+
 /* --- learned-song library --- */
 
 .songmap-librows { display: flex; flex-direction: column; gap: 6px; }

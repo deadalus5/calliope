@@ -1,6 +1,6 @@
 import {
   degreeOf, inferKey, inferSectionKeys, modeById, parseChordSymbol,
-  type WeightedChord,
+  type PitchClass, type WeightedChord,
 } from '../../src/music-core'
 import {
   SONGMAP_VERSION, type Provenance, type SectionKind, type SongKey, type SongMap,
@@ -292,7 +292,19 @@ export function fuse(input: FuseInput): SongMap {
       } catch { /* unparseable — carries no key evidence */ }
     })
   }
-  const inferred = inferKey({ chords: weighted }, { tonalityName: ug.tonalityName, capo: ug.capo })
+  const totalCappedWeight = weighted.reduce((s, w) => s + w.weightBeats, 0)
+  const inferred = inferKey({ chords: weighted }, {
+    tonalityName: ug.tonalityName,
+    capo: ug.capo,
+    audioKey: analyzer.chromaKey
+      ? {
+          root: (((analyzer.chromaKey.root % 12) + 12) % 12) as PitchClass,
+          minor: analyzer.chromaKey.minor,
+          strength: analyzer.chromaKey.strength,
+        }
+      : null,
+    chordCoverage: beats.length > 0 ? Math.min(1, totalCappedWeight / beats.length) : 1,
+  })
   const key: SongKey = { ...inferred }
   // Guard: an inference bug must never emit a modeId the app can't render.
   try { modeById(key.modeId) } catch { key.modeId = key.skeleton === 'minor' ? 'aeolian' : 'ionian' }

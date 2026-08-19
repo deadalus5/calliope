@@ -2,11 +2,13 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { execa } from 'execa'
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { analyzerVersion } from './analyze'
+import { TrackCache } from './cache'
 import { loadConfig } from './config'
 import { JobRunner, type Stage } from './jobs'
 import { versionScore } from './pick'
+import { ensureRateRender, parseRange, quantizeRate } from './serve-audio'
 import { searchUg } from './ug'
 
 /**
@@ -28,7 +30,11 @@ app.use('*', async (c, next) => {
     c.res.headers.set('Access-Control-Allow-Private-Network', 'true')
   }
 })
-app.use('*', cors({ origin: config.corsOrigins }))
+app.use('*', cors({
+  origin: config.corsOrigins,
+  allowHeaders: ['Content-Type', 'Range'],
+  exposeHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
+}))
 
 app.get('/health', async (c) => {
   let ytdlpVersion: string | null = null
@@ -81,6 +87,44 @@ app.post('/pick', async (c) => {
   const body = await c.req.json<{ uri?: string; tabId?: number; youtubeUrl?: string }>()
   if (!body.uri) return c.json({ message: 'missing uri' }, 400)
   return c.json(jobs.pick(body.uri, { tabId: body.tabId, youtubeUrl: body.youtubeUrl }))
+})
+
+// The practice deck's audio: cached analysis download, atempo renders per
+// speed, range requests honored. One user on a LAN — whole-file reads are
+// simpler than streams and plenty fast for ≤10MB files.
+app.on(['GET', 'HEAD'], '/audio/:trackId', async (c) => {
+  const rate = quantizeRate(c.req.query('rate'))
+  if (rate === null) return c.json({ message: 'rate out of range (0.5–1.25)' }, 400)
+  const cache = new TrackCache(config.cacheDir, c.req.param('trackId'))
+  if (!cache.has('audio.m4a')) return c.json({ message: 'no cached audio for this track' }, 404)
+  let path: string
+  try {
+    path = await ensureRateRender(cache, rate)
+  } catch (e) {
+    return c.json({ message: `render failed: ${(e as Error).message.slice(0, 200)}` }, 500)
+  }
+  const size = statSync(path).size
+  const range = parseRange(c.req.header('range'), size)
+  const base: Record<string, string> = {
+    'Accept-Ranges': 'bytes',
+    'Content-Type': 'audio/mp4',
+  }
+  if (range === 'invalid') {
+    return c.body(null, 416, { ...base, 'Content-Range': `bytes */${size}` })
+  }
+  const isHead = c.req.method === 'HEAD'
+  if (range) {
+    const headers = {
+      ...base,
+      'Content-Range': `bytes ${range.start}-${range.end}/${size}`,
+      'Content-Length': String(range.end - range.start + 1),
+    }
+    if (isHead) return c.body(null, 206, headers)
+    return c.body(readFileSync(path).subarray(range.start, range.end + 1), 206, headers)
+  }
+  const headers = { ...base, 'Content-Length': String(size) }
+  if (isHead) return c.body(null, 200, headers)
+  return c.body(readFileSync(path), 200, headers)
 })
 
 app.post('/refine', async (c) => {

@@ -28,7 +28,13 @@ const IDLE: PlayheadState = {
   positionMs: 0, chordIndex: -1, nextChordIndex: -1, sectionIndex: -1, beatsToChange: null,
 }
 
-export function useSongMapPlayhead(map: SongMap, corrections?: UserCorrections | null): {
+export function useSongMapPlayhead(
+  map: SongMap,
+  corrections?: UserCorrections | null,
+  /** Clock to follow — the Spotify estimate by default, the deck's
+   * ctx-derived position in practice-deck mode. */
+  clock: () => number = estimatePositionMs,
+): {
   playhead: PlayheadState
   resolved: ResolvedTiming
 } {
@@ -37,7 +43,7 @@ export function useSongMapPlayhead(map: SongMap, corrections?: UserCorrections |
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const ms = estimatePositionMs()
+      const ms = clock()
       const at = chordAtMs(resolved, ms)
       const next = nextChordAfter(resolved, ms)
       setPlayhead((prev) => {
@@ -59,7 +65,7 @@ export function useSongMapPlayhead(map: SongMap, corrections?: UserCorrections |
       })
     }, 100)
     return () => clearInterval(timer)
-  }, [map, resolved])
+  }, [map, resolved, clock])
 
   return { playhead, resolved }
 }

@@ -22,6 +22,11 @@ export interface Mixer {
   connectDrumVoice(v: DrumVoice): void
   /** Band submix node that duckBacking ramps — pre-master, so ducking never touches the master chain. */
   duck: Tone.Gain
+  /** The practice deck's program bus (audio/deck.ts): a finished master
+   * riding pre-master through the same duck gain, so drills duck records
+   * exactly like the band. Deliberately NOT a MixChannelId — it's not part
+   * of the band, joins no solo group, and MixerStrip stays band-only. */
+  deckBus: Tone.Gain
   /** Resolves when the reverb IR is generated. */
   ready: Promise<void>
   /** Current master peak in dBFS (Tone.Meter after the limiter). */
@@ -70,6 +75,12 @@ export function getMixer(): Mixer {
   const drums = new Tone.Channel({ volume: 0 })
   const drumsComp = new Tone.Compressor({ ratio: 2, attack: 0.03, release: 0.15, threshold: -18 })
   drums.chain(drumsComp, duck)
+
+  // Practice-deck program bus: -2dB trim keeps a hot master mostly under
+  // the master compressor's threshold; no EQ/comp of its own (it's a
+  // finished master, not an instrument).
+  const deckBus = new Tone.Gain(Tone.dbToGain(-2))
+  deckBus.connect(duck)
 
   const channels: Record<MixChannelId, Tone.Channel> = { keys, bass, drums }
 
@@ -149,6 +160,7 @@ export function getMixer(): Mixer {
     channel: (id) => channels[id],
     connectDrumVoice,
     duck,
+    deckBus,
     ready: reverb.ready,
     peakDb,
     applyTrims,

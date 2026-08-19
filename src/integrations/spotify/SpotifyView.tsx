@@ -10,14 +10,19 @@ import {
   connectPlayer, estimatePositionMs, onPlayerState, playTrack, searchTracks,
   seekMs, togglePlay, type PlayerState, type TrackHit,
 } from './player'
+import { deck } from '../../audio/deck'
 import { chartFor, deleteChart, entryAt, saveChart, type TrackChart } from './charts'
+import { PracticeDeck } from './PracticeDeck'
 import { SongLibrary } from './SongLibrary'
-import { SongMapFollower } from './SongMapFollower'
+import { SongMapFollower, type FollowerTransport } from './SongMapFollower'
 import { SongsmithSettings } from './SongsmithSettings'
 import { VersionPicker } from './VersionPicker'
 import { useSidecar } from './sidecar-store'
 import { loadSongMap, removeSongMap } from './songmap-store'
-import { reanalyze, requestRefine, type SongmapStatus, type TrackParams } from './songsmith-client'
+import {
+  audioUrl, probeAudio, reanalyze, requestRefine, trackIdOf,
+  type SongmapStatus, type TrackParams,
+} from './songsmith-client'
 import { useSongmapRequest } from './use-songmap-request'
 import type { SongMap } from './songmap'
 import './spotify.css'
@@ -115,6 +120,8 @@ function JamRoom({ player }: { player: PlayerState }) {
   const [manualMode, setManualMode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
+  const [mode, setMode] = useState<'record' | 'deck'>('record')
+  const [deckStatus, setDeckStatus] = useState<'unavailable' | 'idle' | 'loading' | 'ready'>('unavailable')
 
   const sidecarUrl = useSidecar((s) => s.url)
 
@@ -180,6 +187,54 @@ function JamRoom({ player }: { player: PlayerState }) {
     setSongmap(null)
   }
 
+  // --- Practice deck: the sidecar's copy of this song, played through the
+  // app's own AudioContext (slow-down, beat-tight loops, exact drill clock).
+  useEffect(() => {
+    setMode('record')
+    setDeckStatus('unavailable')
+    if (!songmap) return
+    let alive = true
+    void probeAudio(songmap.trackUri).then((ok) => { if (alive) setDeckStatus(ok ? 'idle' : 'unavailable') })
+    return () => { alive = false }
+  }, [songmap?.trackUri, sidecarUrl]) // eslint-disable-line react-hooks/exhaustive-deps -- keyed by track identity, not map object
+
+  // Leaving the Jam Room silences the deck (nav away mid-practice).
+  useEffect(() => () => deck.dispose(), [])
+
+  const enterDeck = async () => {
+    if (!songmap || mode === 'deck') return
+    setDeckStatus('loading')
+    try {
+      if (deck.trackId !== trackIdOf(songmap.trackUri)) {
+        const uri = songmap.trackUri
+        await deck.load({
+          id: trackIdOf(uri),
+          durationMs: songmap.durationMs,
+          urlForRate: (r) => audioUrl(uri, r)!,
+        })
+      }
+      if (!player.paused) togglePlay() // never two renditions at once
+      deck.seek(estimatePositionMs())
+      setDeckStatus('ready')
+      setMode('deck')
+    } catch {
+      setDeckStatus('unavailable')
+    }
+  }
+
+  const enterRecord = () => {
+    if (mode === 'record') return
+    deck.pause()
+    seekMs(deck.positionMs()) // hand the position back to the record
+    setMode('record')
+  }
+
+  const deckTransport = useMemo<FollowerTransport>(() => ({
+    clockMs: () => deck.positionMs(),
+    seek: (ms: number) => deck.seek(ms),
+    nativeLoop: { set: (a: number, b: number) => deck.setLoop(a, b), clear: () => deck.clearLoop() },
+  }), [])
+
   const sidecarConfigured = Boolean(sidecarUrl)
 
   return (
@@ -229,6 +284,27 @@ function JamRoom({ player }: { player: PlayerState }) {
 
       {showSettings && <SongsmithSettings onClose={() => setShowSettings(false)} />}
 
+      {player.trackUri && songmap && deckStatus !== 'unavailable' && (
+        <div className="panel songmap-modepanel">
+          <div className="controls">
+            <div className="seg">
+              <button className={mode === 'record' ? 'active' : ''} onClick={enterRecord}>record</button>
+              <button
+                className={mode === 'deck' ? 'active' : ''}
+                disabled={deckStatus === 'loading'}
+                onClick={() => void enterDeck()}
+              >
+                {deckStatus === 'loading' ? 'loading audio…' : 'practice deck'}
+              </button>
+            </div>
+            {mode === 'deck' && (
+              <span className="dim">songsmith's copy — slow it down, loop a section, pixel-tight</span>
+            )}
+          </div>
+          {mode === 'deck' && <PracticeDeck map={songmap} />}
+        </div>
+      )}
+
       {player.trackUri && (
         songmap
           ? (
@@ -237,6 +313,7 @@ function JamRoom({ player }: { player: PlayerState }) {
               onRedo={() => void redoSong()}
               onPickTab={(tabId) => void changeChart(tabId)}
               onRefine={sidecarConfigured ? () => void tightenTiming() : undefined}
+              transport={mode === 'deck' ? deckTransport : undefined}
             />
           )
           : <SongPrep

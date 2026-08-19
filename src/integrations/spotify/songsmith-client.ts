@@ -139,6 +139,29 @@ export async function reanalyze(params: TrackParams, stage: 'ug' | 'audio' | 'an
   }))
 }
 
+/** The sidecar's cache key for a track (mirrors songsmith's trackIdOf). */
+export function trackIdOf(trackUri: string): string {
+  return (trackUri.split(':').pop() ?? trackUri).replace(/[^A-Za-z0-9_-]/g, '_')
+}
+
+/** URL of the practice deck's audio at a given rate, or null when no sidecar. */
+export function audioUrl(trackUri: string, rate: number): string | null {
+  const base = getSongsmithUrl()
+  return base ? `${base}/audio/${trackIdOf(trackUri)}?rate=${rate}` : null
+}
+
+/** Does the sidecar hold this track's audio? (HEAD, cheap.) */
+export async function probeAudio(trackUri: string): Promise<boolean> {
+  const url = audioUrl(trackUri, 1)
+  if (!url) return false
+  try {
+    const res = await fetch(url, { method: 'HEAD' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /** Chroma-refine an already-analyzed song ("tighten timing"). */
 export async function requestRefine(params: TrackParams): Promise<SongmapStatus> {
   return toStatus(await call('/refine', {

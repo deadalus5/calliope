@@ -22,14 +22,26 @@ import { useSongMapPlayhead } from './use-songmap-playhead'
  * live here too.
  */
 
-export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
+/** Who owns the playhead: the Spotify player (default) or the deck. */
+export interface FollowerTransport {
+  clockMs(): number
+  seek(ms: number): void
+  /** Sample-accurate loop points (deck mode). */
+  nativeLoop?: { set(aMs: number, bMs: number): void; clear(): void }
+}
+
+const SPOTIFY_TRANSPORT: FollowerTransport = { clockMs: estimatePositionMs, seek: seekMs }
+
+export function SongMapFollower({ map, onRedo, onPickTab, onRefine, transport }: {
   map: SongMap
   onRedo: () => void
   /** Re-pick the UG chart (keeps the audio/analysis cache). */
   onPickTab?: (tabId: number) => void
   /** Chroma-refine the timing (hidden once the map is refined). */
   onRefine?: () => void
+  transport?: FollowerTransport
 }) {
+  const t = transport ?? SPOTIFY_TRANSPORT
   const [showProvenance, setShowProvenance] = useState(false)
   const [fixTiming, setFixTiming] = useState(false)
   const [versions, setVersions] = useState<UgVersionChoice[] | null>(null)
@@ -39,12 +51,13 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
     corrections, lastTap, tap, nudge, bumpSection, bumpGlobal, resetSection, resetAll,
   } = useCorrections(map)
 
-  const { playhead, resolved } = useSongMapPlayhead(map, corrections)
+  const { playhead, resolved } = useSongMapPlayhead(map, corrections, t.clockMs)
 
   const { loopIndex, toggle: toggleLoop } = useSectionLoop({
     resolved,
-    clockMs: estimatePositionMs,
-    seek: seekMs,
+    clockMs: t.clockMs,
+    seek: t.seek,
+    native: t.nativeLoop,
   })
 
   const openVersions = async () => {
@@ -140,7 +153,7 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
         map={map}
         resolved={resolved}
         activeIndex={playhead.sectionIndex}
-        onSeek={seekMs}
+        onSeek={t.seek}
         loopIndex={loopIndex}
         onToggleLoop={toggleLoop}
       />
@@ -165,7 +178,7 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
           corrections={corrections}
           lastTap={lastTap}
           activeSectionIndex={playhead.sectionIndex}
-          onTap={() => tap(estimatePositionMs())}
+          onTap={() => tap(t.clockMs())}
           onBumpGlobal={bumpGlobal}
           onBumpSection={bumpSection}
           onResetSection={resetSection}
@@ -179,7 +192,7 @@ export function SongMapFollower({ map, onRedo, onPickTab, onRefine }: {
         chordIndex={playhead.chordIndex}
         nextChordIndex={playhead.nextChordIndex}
         activeSectionIndex={playhead.sectionIndex}
-        onSeek={seekMs}
+        onSeek={t.seek}
         nudgeMode={fixTiming}
         onNudge={nudge}
       />
