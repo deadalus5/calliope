@@ -120,7 +120,9 @@ describe('expandSheet', () => {
     expect(plans[0].lines).toHaveLength(6) // (chords + riff hold) × 3
     const holds = plans[0].lines.filter((l) => l.synthesized)
     expect(holds).toHaveLength(3)
-    expect(holds[0].chords[0].symbol).toBe('D') // last-seen chord, not the fallback
+    // The tonic wins over the last-seen chord: a named riff is the home
+    // vamp, and the chord before it is usually a turnaround dominant.
+    expect(holds[0].chords[0].symbol).toBe('Em')
   })
 })
 

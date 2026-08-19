@@ -385,6 +385,9 @@ export class JobRunner {
       // grid — if one does, analyzer caches are aliasing again.
       const dup = this.duplicateGridWarning(params.trackUri, analyzer)
       if (dup) songmap.provenance.fusion.warnings.push(dup)
+      // A refinement is DERIVED from the fused map — writing a fresh fusion
+      // invalidates it, or a stale refined file shadows the new work.
+      cache.remove('songmap.refined.json')
       cache.writeJson('songmap.json', songmap)
       // Late success after a watchdog abandonment still lands on disk (the
       // next request simply finds it ready) — only the state write is void.

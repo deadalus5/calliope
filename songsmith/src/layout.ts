@@ -131,7 +131,10 @@ export function expandSheet(sections: UgSection[], fallbackTonic: string | null)
       const reps = Math.max(1, line.repeat ?? 1)
       for (let r = 0; r < reps; r++) {
         if (line.riffRef && line.chords.length === 0) {
-          const symbol = lastChordSymbol ?? fallbackTonic
+          // A named riff is almost always the song's HOME vamp (Superstition's
+          // Riff 1 is the Ebm figure), while the last written chord before it
+          // is typically a turnaround dominant — prefer the tonic.
+          const symbol = fallbackTonic ?? lastChordSymbol
           if (!symbol) continue
           planLines.push({
             chords: [holdToken(symbol)], lyricLen: 0, chordLineLen: 1, rawBars: 0, synthesized: true,

@@ -116,6 +116,19 @@ describe('tonic gravity', () => {
   })
 })
 
+describe('maj7 dominants are not dominants', () => {
+  it('an Amaj7–Emaj7 neo-soul vamp with the sheet saying E reads IV–I in E, not I–Vmaj7 in A', () => {
+    const chords = [
+      wc('Amaj7', 8, { start: true }), wc('Emaj7', 8),
+      wc('Amaj7', 8, { start: true }), wc('Emaj7', 8),
+      wc('E', 8, { start: true }), wc('B', 4), wc('C#m7', 4), wc('Amaj7', 8, { end: true }),
+    ]
+    const r = inferKey({ chords }, { tonalityName: 'E' })
+    expect(r.root).toBe(PC.E)
+    expect(r.modeId).toBe('ionian')
+  })
+})
+
 describe('audio key prior', () => {
   it('a sparse dominant-vamp chart falls to the corroborated sheet+audio root (the Superstition case)', () => {
     // The chart writes only the chorus stabs — chord fit alone hears B. The

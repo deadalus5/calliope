@@ -89,6 +89,9 @@ const OPENING_BONUS_BEATS = 6
 /** The very last chord — songs end home more often than not. Kept small:
  * fade-outs legitimately end mid-vamp (Gravity fades on the IV). */
 const CLOSING_BONUS_BEATS = 4
+/** A maj7-quality chord sitting on a candidate root's 5th degree argues
+ * AGAINST that root (see fitScore). */
+const MAJ7_DOMINANT_PENALTY_BEATS = 10
 
 /** Duration-weighted fraction of chord tones inside the mode, plus tonic
  * gravity. Section STARTS count double what ends do: the fuser pins a
@@ -121,6 +124,15 @@ export function fitScore(input: KeyInferInput, root: PitchClass, mode: ModeSpec)
       bonus += b
     }
   })
+  // A maj7 chord rooted on the candidate's 5th degree is a terrible V —
+  // real dominants are dom7/triads. Amaj7↔Emaj7 neo-soul vamps read as
+  // IVmaj7–Imaj7 in E, never I–Vmaj7 in A; this is what breaks that tie.
+  if (mode.skeleton === 'major') {
+    const hasMaj7OnFifth = input.chords.some((wc) =>
+      degreeOf(wc.chord.root, root) === 7 && wc.chord.quality.intervals.includes(11))
+    if (hasMaj7OnFifth) bonus -= MAJ7_DOMINANT_PENALTY_BEATS
+  }
+
   // Tonic gravity only means something inside a coherent key: bonuses are
   // scaled by the mean diatonic fit, so chromatic mush can't ride an opening
   // chord to a confident-looking wrong answer.
@@ -149,9 +161,17 @@ export function inferKey(input: KeyInferInput, hints?: KeyInferHints): SongKeyRe
       }
       const audio = hints?.audioKey
       if (audio && audio.root === root) {
-        const sparsity = Math.max(0.15, 1 - Math.min(1, hints?.chordCoverage ?? 1))
-        const trust = !hint || hint.root === audio.root ? 1 : 0.25
-        score += AUDIO_KEY_BONUS_BEATS * audio.strength * sparsity * trust
+        if (hint && hint.root === audio.root) {
+          // The sheet's editor and the record itself AGREE on the root —
+          // two independent sensors corroborating is near-ground-truth, no
+          // matter how few chords the chart bothers to write (a riff chart
+          // like Superstition writes only turnaround dominants).
+          score += AUDIO_KEY_BONUS_BEATS * audio.strength
+        } else {
+          const sparsity = Math.max(0.15, 1 - Math.min(1, hints?.chordCoverage ?? 1))
+          const trust = hint ? 0.25 : 1
+          score += AUDIO_KEY_BONUS_BEATS * audio.strength * sparsity * trust
+        }
       }
       const perRoot = bestPerRoot.get(root)
       if (perRoot === undefined || score > perRoot) bestPerRoot.set(root, score)
