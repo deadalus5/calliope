@@ -1,18 +1,22 @@
 import {
-  degreeOf, inferKey, inferSectionKeys, modeById, parseChordSymbol,
+  degreeOf, inferKey, inferSectionKeys, modeById, parseChordSymbol, pcName,
   type PitchClass, type WeightedChord,
 } from '../../src/music-core'
 import {
   SONGMAP_VERSION, type Provenance, type SectionKind, type SongKey, type SongMap,
   type SongMapChord, type SongSection,
 } from '../../src/integrations/spotify/songmap'
-import type { AnalyzerResult, UgChart, UgSection } from './types'
+import { analyzerKindOf, layout, nearestBeatIndex } from './layout'
+import type { AnalyzerResult, UgChart } from './types'
 
 /**
- * Fusion: UG owns the names and the chord sequences, the analyzer owns the
- * clock (beat grid + section boundaries). This module marries them into a
- * SongMap. Pure — fixture-tested without network, yt-dlp, or Python.
+ * Fusion: the SHEET owns the form (section order + chord sequence + relative
+ * timing — laid onto the beat grid by layout.ts/SHEETLAY), the analyzer owns
+ * the clock, and key/mode inference runs over the laid chords. Pure —
+ * fixture-tested without network, yt-dlp, or Python.
  */
+
+export { analyzerKindOf, nearestBeatIndex }
 
 export interface FuseInput {
   trackUri: string
@@ -28,139 +32,22 @@ export interface FuseInput {
   now: string
 }
 
-// --- label normalization ------------------------------------------------------
-
-/** allin1's segment vocabulary -> the SongMap kind enum. */
-const ANALYZER_KINDS: Record<string, SectionKind> = {
-  start: 'intro', intro: 'intro',
-  end: 'outro', outro: 'outro',
-  break: 'inst', inst: 'inst',
-  verse: 'verse', chorus: 'chorus', bridge: 'bridge', solo: 'solo',
-}
-
-export function analyzerKindOf(label: string): SectionKind {
-  return ANALYZER_KINDS[label.toLowerCase()] ?? 'other'
-}
-
 const KIND_DISPLAY: Record<SectionKind, string> = {
   intro: 'INTRO', verse: 'V', chorus: 'CH', bridge: 'BR',
   solo: 'SOLO', inst: 'INST', outro: 'OUTRO', other: 'PART',
 }
 
-// --- alignment -----------------------------------------------------------------
-
-interface AlignedSegment {
-  startMs: number
-  endMs: number
-  kind: SectionKind
-  ug: UgSection | null
-  kindMatched: boolean
-}
-
-function compatible(a: SectionKind, b: SectionKind): boolean {
-  if (a === b) return true
-  if (a === 'other' || b === 'other') return true
-  const instish = new Set<SectionKind>(['inst', 'solo', 'intro', 'outro'])
-  return instish.has(a) && instish.has(b)
-}
-
-/**
- * In-order greedy alignment with one-step lookahead on both sides. The
- * analyzer's boundaries are authoritative — every analyzer segment produces
- * an output section; UG sections attach to them in order.
- */
-export function alignSections(analyzer: AnalyzerResult, ugSections: UgSection[]): AlignedSegment[] {
-  const out: AlignedSegment[] = []
-  let j = 0
-  for (let i = 0; i < analyzer.segments.length; i++) {
-    const seg = analyzer.segments[i]
-    const kind = analyzerKindOf(seg.label)
-    const base = { startMs: seg.startMs, endMs: seg.endMs, kind }
-
-    if (j >= ugSections.length) {
-      out.push({ ...base, ug: null, kindMatched: false })
-      continue
-    }
-    if (compatible(kind, ugSections[j].kind)) {
-      out.push({ ...base, ug: ugSections[j], kindMatched: kind === ugSections[j].kind })
-      j++
-      continue
-    }
-    // Analyzer heard a segment UG never wrote (e.g. an inst break): if the
-    // NEXT analyzer segment matches the current UG section, hold UG here.
-    const nextSeg = analyzer.segments[i + 1]
-    if (nextSeg && compatible(analyzerKindOf(nextSeg.label), ugSections[j].kind)) {
-      out.push({ ...base, ug: null, kindMatched: false })
-      continue
-    }
-    // UG wrote a section the analyzer merged away: skip the UG section and
-    // try the next one.
-    if (j + 1 < ugSections.length && compatible(kind, ugSections[j + 1].kind)) {
-      j++
-      out.push({ ...base, ug: ugSections[j], kindMatched: kind === ugSections[j].kind })
-      j++
-      continue
-    }
-    // No agreement either way — trust the order.
-    out.push({ ...base, ug: ugSections[j], kindMatched: false })
-    j++
+/** Tonic symbol for riff holds when no chord has sounded yet. */
+function fallbackTonic(ug: UgChart, analyzer: AnalyzerResult): string | null {
+  if (ug.tonalityName) {
+    const m = /^([A-Ga-g][#b]*)\s*(m|min|minor)?$/.exec(ug.tonalityName.trim())
+    if (m) return `${m[1]}${m[2] ? 'm' : ''}`
   }
-  return out
-}
-
-// --- chord distribution ----------------------------------------------------------
-
-/**
- * Nearest index into a sorted ms array within tolMs, else -1. Downbeats and
- * beats come from the analyzer as separate float lists — matching them by
- * exact ms equality only works while both happen to round identically, so
- * the lookup is tolerant by design.
- */
-export function nearestBeatIndex(beatsMs: number[], ms: number, tolMs = 40): number {
-  if (beatsMs.length === 0) return -1
-  let lo = 0
-  let hi = beatsMs.length - 1
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1
-    if (beatsMs[mid] < ms) lo = mid + 1
-    else hi = mid
+  if (analyzer.chromaKey) {
+    const root = ((analyzer.chromaKey.root % 12) + 12) % 12
+    return `${pcName(root as PitchClass, root as PitchClass)}${analyzer.chromaKey.minor ? 'm' : ''}`
   }
-  const best = lo > 0 && Math.abs(beatsMs[lo - 1] - ms) <= Math.abs(beatsMs[lo] - ms) ? lo - 1 : lo
-  return Math.abs(beatsMs[best] - ms) <= tolMs ? best : -1
-}
-
-/** Beat indices of downbeats inside [startMs, endMs). */
-function downbeatsWithin(analyzer: AnalyzerResult, startMs: number, endMs: number): number[] {
-  const out: number[] = []
-  for (const ms of analyzer.downbeatsMs) {
-    if (ms >= startMs && ms < endMs) {
-      const idx = nearestBeatIndex(analyzer.beatsMs, ms)
-      if (idx >= 0 && out[out.length - 1] !== idx) out.push(idx)
-    }
-  }
-  return out
-}
-
-/**
- * Distribute n chords across the section's downbeats (falling back to plain
- * beats when a section has more chords than bars). Chords land ON grid
- * points in phase-1 fusion; sub-beat placement is the refine/tap layer's job.
- */
-export function distributeChords(slots: number[], n: number): number[] {
-  if (n === 0 || slots.length === 0) return []
-  const out: number[] = []
-  for (let i = 0; i < n; i++) {
-    out.push(slots[Math.min(slots.length - 1, Math.floor((i * slots.length) / n))])
-  }
-  // Monotonic non-decreasing by construction; collapse accidental duplicates
-  // by nudging forward one slot when possible so two chords never share a beat.
-  for (let i = 1; i < out.length; i++) {
-    if (out[i] <= out[i - 1]) {
-      const slotPos = slots.indexOf(out[i - 1])
-      out[i] = slotPos + 1 < slots.length ? slots[slotPos + 1] : out[i - 1]
-    }
-  }
-  return out
+  return null
 }
 
 // --- the fuser --------------------------------------------------------------------
@@ -169,104 +56,56 @@ export function fuse(input: FuseInput): SongMap {
   const { ug, analyzer } = input
   const warnings: string[] = []
 
-  // Beat grid bookkeeping.
   const beats = analyzer.beatsMs
   const downbeatIndices = analyzer.downbeatsMs
     .map((ms) => nearestBeatIndex(beats, ms))
     .filter((i, k, arr) => i >= 0 && arr.indexOf(i) === k)
   const beatsPerBar = Math.max(1, ...analyzer.beatPositions)
 
-  // UG sections with no chords inherit the earlier same-kind section's
-  // sequence (sheets write a verse's changes once).
-  const chordsByKind = new Map<SectionKind, UgSection>()
-  const hydrated: UgSection[] = ug.sections.map((s) => {
-    if (s.chords.length > 0) {
-      if (!chordsByKind.has(s.kind)) chordsByKind.set(s.kind, s)
-      return s
-    }
-    const donor = chordsByKind.get(s.kind)
-    return donor ? { ...s, chords: donor.chords } : s
-  })
-
-  const aligned = alignSections(analyzer, hydrated)
-  const matched = aligned.filter((a) => a.kindMatched).length
-  const sectionAlignConfidence = aligned.length === 0 ? 0 : matched / aligned.length
-  if (sectionAlignConfidence < 0.6) {
-    warnings.push('section labels from the sheet and the recording disagree a lot — timing may be rough; tap to fix')
-  }
-
-  // Duration sanity: a UG section whose chord count implies a wildly
-  // different length than its segment got is worth flagging.
-  for (const a of aligned) {
-    if (!a.ug || a.ug.chords.length === 0) continue
-    const bars = downbeatsWithin(analyzer, a.startMs, a.endMs).length
-    if (bars > 0 && a.ug.chords.length > bars * beatsPerBar) {
-      warnings.push(`"${a.ug.label}" has more chords (${a.ug.chords.length}) than beats in its segment — chords compressed`)
+  // --- lay the sheet onto the grid ---------------------------------------
+  const laid = layout(ug.sections, analyzer, fallbackTonic(ug, analyzer))
+  warnings.push(...laid.warnings)
+  for (const c of laid.chords) {
+    if (!c.parseable) {
+      warnings.push(`chord "${c.raw}" isn't in the app's vocabulary — shown as written, no fretboard tones`)
     }
   }
 
-  // Sections out: analyzer boundaries, UG names. Ordinals re-assigned in
-  // output order per kind (corrections key on these).
-  const sections: SongSection[] = []
-  const ordinalSeen = new Map<SectionKind, number>()
+  // Sections out, in SHEET order with sheet identity — display labels via
+  // the same convention as before (V1, CH2, INST 2 when a kind repeats).
   const kindCount = new Map<SectionKind, number>()
-  for (const a of aligned) kindCount.set(a.kind, (kindCount.get(a.kind) ?? 0) + 1)
-  aligned.forEach((a, i) => {
-    const ordinal = (ordinalSeen.get(a.kind) ?? 0) + 1
-    ordinalSeen.set(a.kind, ordinal)
-    const display = KIND_DISPLAY[a.kind]
-    const label = a.kind === 'verse' || a.kind === 'chorus'
-      ? `${display}${ordinal}`
-      : (kindCount.get(a.kind) ?? 1) > 1 ? `${display} ${ordinal}` : display
-    sections.push({
+  for (const s of laid.sections) kindCount.set(s.kind, (kindCount.get(s.kind) ?? 0) + 1)
+  const sections: SongSection[] = laid.sections.map((s, i) => {
+    const display = KIND_DISPLAY[s.kind]
+    const label = s.kind === 'verse' || s.kind === 'chorus'
+      ? `${display}${s.ordinal}`
+      : (kindCount.get(s.kind) ?? 1) > 1 ? `${display} ${s.ordinal}` : display
+    return {
       id: `s${i}`,
       label,
-      kind: a.kind,
-      ordinal,
-      startMs: Math.round(a.startMs),
-      endMs: Math.round(a.endMs),
-    })
+      kind: s.kind,
+      ordinal: s.ordinal,
+      startMs: s.startMs,
+      endMs: s.endMs,
+      ...(s.synthesized ? { synthesized: true } : {}),
+    }
   })
 
-  // Chords: distribute each aligned section's sequence over its downbeats.
-  const chords: SongMapChord[] = []
-  aligned.forEach((a, i) => {
-    if (!a.ug || a.ug.chords.length === 0) return
-    let slots = downbeatsWithin(analyzer, a.startMs, a.endMs)
-    if (a.ug.chords.length > slots.length) {
-      // More chords than bars — use every beat in the segment instead.
-      slots = []
-      for (let b = 0; b < beats.length; b++) {
-        if (beats[b] >= a.startMs && beats[b] < a.endMs) slots.push(b)
-      }
-    }
-    const placed = distributeChords(slots, a.ug.chords.length)
-    a.ug.chords.forEach((token, k) => {
-      if (k >= placed.length) return
-      // Drop a chord landing on the same beat as the previous one (can only
-      // happen when a segment is shorter than its chord list).
-      const prev = chords[chords.length - 1]
-      if (prev && prev.beatIndex >= placed[k] && prev.sectionId === `s${i}`) return
-      chords.push({
-        symbol: token.symbol,
-        beatIndex: placed[k],
-        ms: Math.round(beats[placed[k]]),
-        durationBeats: 0, // filled below
-        sectionId: `s${i}`,
-        rootDegree: 0, // filled after key inference
-      })
-      if (!token.parseable) {
-        warnings.push(`chord "${token.raw}" isn't in the app's vocabulary — shown as written, no fretboard tones`)
-      }
-    })
-  })
+  const chords: SongMapChord[] = laid.chords.map((c) => ({
+    symbol: c.symbol,
+    beatIndex: c.beatIndex,
+    ms: Math.round(beats[Math.min(c.beatIndex, beats.length - 1)]),
+    durationBeats: 0, // filled below
+    sectionId: `s${c.sectionIndex}`,
+    rootDegree: 0, // filled after key inference
+  }))
   chords.sort((a, b) => a.beatIndex - b.beatIndex)
   for (let i = 0; i < chords.length; i++) {
     const nextBeat = i + 1 < chords.length ? chords[i + 1].beatIndex : beats.length
     chords[i].durationBeats = Math.max(1, nextBeat - chords[i].beatIndex)
   }
 
-  // Key inference over the placed chords, then per-section overrides.
+  // --- key inference over the laid chords --------------------------------
   const bySection = new Map<string, SongMapChord[]>()
   for (const c of chords) {
     const list = bySection.get(c.sectionId) ?? []
@@ -274,9 +113,8 @@ export function fuse(input: FuseInput): SongMap {
     bySection.set(c.sectionId, list)
   }
   // Cap each occurrence's key-evidence weight at two bars: durationBeats is
-  // gap-to-next-change, so a chord held before a sparse stretch (or ending a
-  // section) otherwise casts hundreds of votes and drags the tonic with it
-  // (this is exactly how Gravity's long-ringing C outvoted G).
+  // gap-to-next-change, so a chord held before a sparse stretch otherwise
+  // casts hundreds of votes and drags the tonic with it.
   const weightCap = 2 * beatsPerBar
   const weighted: WeightedChord[] = []
   for (const [sectionId, list] of bySection) {
@@ -365,7 +203,7 @@ export function fuse(input: FuseInput): SongMap {
       },
       audio: input.audio,
       analyzer: { name: input.analyzerName, version: input.analyzerVersion },
-      fusion: { fusedAt: input.now, sectionAlignConfidence, warnings },
+      fusion: { fusedAt: input.now, sectionAlignConfidence: laid.sectionAlignConfidence, warnings },
     },
   }
 }

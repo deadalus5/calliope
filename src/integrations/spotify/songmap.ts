@@ -43,6 +43,9 @@ export interface SongSection {
   endMs: number
   /** Set when a section clearly modulates (bridges). */
   keyOverride?: SongKey
+  /** The sheet didn't write this — the layout inferred it (an unwritten
+   * intro, tail vamp). Display normally; corrections attach as usual. */
+  synthesized?: boolean
 }
 
 export interface SongMapChord {

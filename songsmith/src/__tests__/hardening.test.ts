@@ -151,19 +151,21 @@ describe('fuse with jittered downbeats', () => {
       beatPositions: positions,
       segments: [{ startMs: 0, endMs: 16_000, label: 'verse' }],
     }
+    const tokens = ['Am', 'F', 'C', 'G'].map((s) => ({ symbol: s, raw: s, parseable: true }))
     return {
       trackUri: 'spotify:track:jitter', trackName: 'Jitter', artistName: 'Test', durationMs: 16_000,
       ug: {
         tabId: 1, url: 'https://ug/1', versionLabel: 'v1', rating: 5, votes: 10, capo: 0,
         tonalityName: null, official: false,
         sections: [{
-          label: 'Verse 1', kind: 'verse', ordinal: 1,
-          chords: [
-            { symbol: 'Am', raw: 'Am', parseable: true },
-            { symbol: 'F', raw: 'F', parseable: true },
-            { symbol: 'C', raw: 'C', parseable: true },
-            { symbol: 'G', raw: 'G', parseable: true },
-          ],
+          label: 'Intro', kind: 'intro', ordinal: 1,
+          chords: tokens,
+          lines: [{
+            kind: 'run',
+            chords: tokens.map((t, i) => ({ ...t, col: i * 8 })),
+            lyricLen: 0,
+            chordLineLen: 32,
+          }],
         }],
       },
       analyzer,
