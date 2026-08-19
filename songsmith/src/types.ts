@@ -10,13 +10,45 @@ export interface UgChordToken {
   parseable: boolean
 }
 
+/** A chord with its character column in the (de-tagged) chord line — the
+ * sheet's own timing notation: where over the lyric the change lands. */
+export interface SheetChord extends UgChordToken {
+  col: number
+}
+
+export interface SheetLine {
+  /** 'pair' = chord line + its lyric line ([tab] block); 'run' = bare chord
+   * line (intros/instrumentals) or a riff reference. */
+  kind: 'pair' | 'run'
+  chords: SheetChord[]
+  /** Visible length of the lyric line (0 for runs). */
+  lyricLen: number
+  /** Visible length of the de-tagged chord line. */
+  chordLineLen: number
+  /** Written repeat on this line ('x2'). */
+  repeat?: number
+  /** The line is a named-riff mention ('Riff 1') with no chords of its own —
+   * layout turns it into a hold. */
+  riffRef?: string
+}
+
 export interface UgSection {
   /** Header as written: 'Verse 1', 'Guitar Solo'. */
   label: string
   kind: SectionKind
   /** 1-based per kind, in sheet order. */
   ordinal: number
+  /** Flat as-written chord sequence (derived from lines; repeats NOT
+   * expanded — expansion is the layout's job). */
   chords: UgChordToken[]
+  /** The sheet's own structure, in order. */
+  lines: SheetLine[]
+  /** Section-level written repeat ('x2' after the body). */
+  repeat?: number
+  /** 'play the same progression for the following N verses'. */
+  playSameForNext?: number
+  /** 'Repeat … and fade' — open-ended tail annotation. */
+  openEnded?: boolean
 }
 
 export interface UgChart {

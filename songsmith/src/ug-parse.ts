@@ -1,6 +1,6 @@
 import { chordSymbol, normalizePc, parseChordSymbol } from '../../src/music-core'
 import type { SectionKind, UgVoicing } from '../../src/integrations/spotify/songmap'
-import type { UgChart, UgChordToken, UgSection, UgVersionInfo } from './types'
+import type { SheetChord, SheetLine, UgChart, UgChordToken, UgSection, UgVersionInfo } from './types'
 
 /**
  * Pure parsing of Ultimate Guitar pages. Every UG page embeds its data as
@@ -126,38 +126,196 @@ function toToken(raw: string, capo: number): UgChordToken {
 
 // --- the sheet content -------------------------------------------------------
 
+const CH_RE = /\[ch\]([^[]*)\[\/ch\]/g
+
+/** A raw line's chords with their columns in the DE-TAGGED line, plus the
+ * de-tagged visible text. */
+function chordsWithCols(rawLine: string, capo: number): { chords: SheetChord[]; text: string } {
+  const chords: SheetChord[] = []
+  let text = ''
+  let last = 0
+  CH_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = CH_RE.exec(rawLine)) !== null) {
+    text += rawLine.slice(last, m.index)
+    const raw = m[1].trim()
+    if (raw) chords.push({ ...toToken(raw, capo), col: text.length })
+    text += m[1]
+    last = m.index + m[0].length
+  }
+  text += rawLine.slice(last)
+  return { chords, text: text.replace(/\s+$/, '') }
+}
+
+/** End-of-line repeat marker: 'x2' / '× 3', optionally inside a closing
+ * paren. Anchored so fret grids ('x 5') and spellings ('x68676') don't hit. */
+function lineRepeat(text: string): number | undefined {
+  const m = /(?:^|[\s)])[x×]\s?([2-9])\s*\)?\s*$/i.exec(text)
+  return m ? Number(m[1]) : undefined
+}
+
+/** A named-riff mention: 'Riff 1', 'Riff 1 x2' (chordless harmonic event). */
+function riffMention(text: string): { ref: string; repeat?: number } | null {
+  const m = /^\s*(riff\s*\d+)\s*(?:[x×]\s?([2-9]))?\s*$/i.exec(text)
+  return m ? { ref: m[1].toLowerCase(), repeat: m[2] ? Number(m[2]) : undefined } : null
+}
+
+/** Chord-dictionary / fret-spelling line: '[ch]Am7[/ch] : 5x5550' or
+ * '[ch]A[/ch] = (5-x-7-6-5-x)' — voicing notation, not music. */
+function isChordDictionaryLine(residue: string): boolean {
+  return /[:=]/.test(residue) && /\d/.test(residue)
+}
+
+/** A 6-string tab-staff line: 'e|---7-5---|', 'Bb|---0h2---|'. */
+function isTabStaffLine(text: string): boolean {
+  return /^\s*[eEbBgGdDaA][b#]?\|/.test(text)
+}
+
+/** Bracketed lines that are NOT section headers: prose instructions and
+ * fret diagrams. They become annotations on the CURRENT section instead. */
+function isProseHeader(label: string): boolean {
+  if (/\d\s+\d/.test(label)) return true // '[Cm  8 10 10 888]' fret diagram
+  if (label.length > 32) return true
+  return /\b(plays?|uses?|says?|following|progression|breakdown|continually|except)\b/i.test(label)
+}
+
+/** 'play the same progression for the following 2 verses' → 2. */
+function playSameForNext(text: string): number | undefined {
+  const m = /same\s+(?:progression|chords|thing).*?(?:following|next)\s+(\d+|two|three|four)/i.exec(text)
+  if (!m) return undefined
+  const words: Record<string, number> = { two: 2, three: 3, four: 4 }
+  return words[m[1].toLowerCase()] ?? Number(m[1])
+}
+
+/** 'Repeat Riff 1 and fade' / 'repeat till end' → open-ended tail. */
+function isOpenEndedRepeat(text: string): boolean {
+  return /repeat.*(and fade|to fade|till (the )?end|until (the )?end|to end)/i.test(text)
+}
+
 /**
- * Walk wiki_tab content: `[Verse 1]`-style headers open sections, `[ch]X[/ch]`
- * tokens are chords in written order. Chords before any header land in an
- * implicit first section.
+ * Walk wiki_tab content LINE-WISE. `[Verse 1]`-style headers open sections;
+ * `[tab]…[/tab]` blocks pair a chord line with its lyric line (219/220 of
+ * the real-world corpus — the atom of the format); bare `[ch]` lines are
+ * chord runs; chord columns, line repeats, riff mentions, and prose repeat
+ * instructions are preserved — they're the sheet's own timing notation.
+ * Chord dictionaries, fret diagrams, and prose "headers" are rejected as
+ * music but mined for annotations.
  */
 export function parseSheet(content: string, capo: number): UgSection[] {
   const sections: UgSection[] = []
   const seen = new Map<SectionKind, number>()
   let current: UgSection | null = null
+  let discard = false // inside a [Chords] dictionary section
 
   const push = (label: string) => {
     const kind = sectionKindOf(label)
-    current = { label, kind, ordinal: ordinalOf(label, kind, seen), chords: [] }
+    current = { label, kind, ordinal: ordinalOf(label, kind, seen), chords: [], lines: [] }
     sections.push(current)
+    discard = false
   }
 
-  // Split into header / chord tokens, in document order.
-  const re = /\[(?:(ch)\]([^[]*)\[\/ch\]|([^\][\r\n]+)\])/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(content)) !== null) {
-    if (m[1] === 'ch') {
-      const raw = m[2].trim()
-      if (!raw) continue
-      if (!current) push('Intro')
-      current!.chords.push(toToken(raw, capo))
-    } else {
-      const label = m[3].trim()
-      // [tab]/[/tab] wrap lyric/chord line pairs; skip non-section brackets.
-      if (/^\/?tab$/i.test(label)) continue
-      push(label)
-    }
+  const addLine = (line: SheetLine) => {
+    if (discard || line.chords.length === 0 && !line.riffRef) return
+    if (!current) push('Intro')
+    current!.lines.push(line)
+    current!.chords.push(...line.chords.map(({ col: _col, ...token }) => token))
   }
+
+  const handleHeader = (label: string, remainder: string) => {
+    if (/^chords?$/i.test(label)) { discard = true; return }
+    if (isProseHeader(label)) {
+      // Annotation, not a section: mine it, keep the current section open.
+      if (current) {
+        const n = playSameForNext(label)
+        if (n) current.playSameForNext = n
+        if (isOpenEndedRepeat(label)) current.openEnded = true
+      }
+      return
+    }
+    push(label)
+    const rep = lineRepeat(remainder)
+    if (rep && current) current.repeat = rep
+  }
+
+  // Track [tab] blocks across lines; inside one, the first chord line and
+  // the first following non-staff line form a pair.
+  let inTab = false
+  let pendingChordLine: { chords: SheetChord[]; text: string } | null = null
+
+  const flushPending = () => {
+    if (!pendingChordLine) return
+    addLine({
+      kind: 'run',
+      chords: pendingChordLine.chords,
+      lyricLen: 0,
+      chordLineLen: pendingChordLine.text.length,
+      repeat: lineRepeat(pendingChordLine.text),
+    })
+    pendingChordLine = null
+  }
+
+  for (const rawLine of content.split('\n')) {
+    let line = rawLine.replace(/\r$/, '')
+    const opens = /\[tab\]/i.test(line)
+    const closes = /\[\/tab\]/i.test(line)
+    line = line.replace(/\[\/?tab\]/gi, '')
+    if (opens) { flushPending(); inTab = true }
+
+    const headerMatch = /^\s*\[([^\]\r\n]+)\]\s*(.*)$/.exec(line)
+    if (headerMatch && !/^\/?ch$/i.test(headerMatch[1].trim())) {
+      flushPending()
+      handleHeader(headerMatch[1].trim(), headerMatch[2])
+      if (closes) inTab = false
+      continue
+    }
+
+    const { chords, text } = chordsWithCols(line, capo)
+    if (chords.length > 0) {
+      if (isChordDictionaryLine(text.replace(/[A-Ga-g][#b]?[^\s:=]*/g, '').trim()) && /[:=]/.test(text)) {
+        // '[ch]Am7[/ch] : 5x5550' — voicing notation, not music.
+        if (closes) inTab = false
+        continue
+      }
+      flushPending()
+      if (inTab) {
+        pendingChordLine = { chords, text }
+      } else {
+        addLine({ kind: 'run', chords, lyricLen: 0, chordLineLen: text.length, repeat: lineRepeat(text) })
+      }
+    } else if (text.trim().length > 0) {
+      const riff = riffMention(text)
+      if (riff) {
+        flushPending()
+        addLine({ kind: 'run', chords: [], lyricLen: 0, chordLineLen: text.length, riffRef: riff.ref, repeat: riff.repeat })
+      } else if (pendingChordLine && !isTabStaffLine(text)) {
+        // The lyric line under a pending chord line: a pair.
+        addLine({
+          kind: 'pair',
+          chords: pendingChordLine.chords,
+          lyricLen: text.length,
+          chordLineLen: pendingChordLine.text.length,
+          repeat: lineRepeat(text) ?? lineRepeat(pendingChordLine.text),
+        })
+        pendingChordLine = null
+      } else {
+        // Prose: mine annotations ('play the same…', 'repeat and fade').
+        // (Local read: TS can't track closure writes to `current`.)
+        const cur = current as UgSection | null
+        if (cur) {
+          const n = playSameForNext(text)
+          if (n) cur.playSameForNext = n
+          if (isOpenEndedRepeat(text)) cur.openEnded = true
+        }
+      }
+    }
+
+    if (closes) { flushPending(); inTab = false }
+  }
+  flushPending()
+
+  // Empty sections are KEPT: a bare '[Verse 2]' header relies on the layout
+  // hydrating it from the first same-kind section — dropping it would lose
+  // the form. Only never-musical bracket noise was filtered above.
   return sections
 }
 

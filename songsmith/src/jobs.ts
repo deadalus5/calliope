@@ -1,4 +1,3 @@
-import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { execa } from 'execa'
 import { analyzerVersion, estimateChromaKey, runAnalyzer, toAnalyzerResult } from './analyze'
@@ -27,6 +26,8 @@ interface JobState {
   running: boolean
   current: JobStatus
   params: TrackParams
+  /** Set by the watchdog: the work is orphaned; its state writes are void. */
+  abandoned?: boolean
 }
 
 const HINTS: [RegExp, string][] = [
@@ -71,7 +72,7 @@ export class JobRunner {
       params,
     }
     this.jobs.set(params.trackUri, state)
-    this.enqueue(() => this.run(state, cache))
+    this.enqueue(state, cache, () => this.run(state, cache))
     return state.current
   }
 
@@ -102,7 +103,7 @@ export class JobRunner {
       params: p,
     }
     this.jobs.set(trackUri, state)
-    this.enqueue(() => this.runRefine(state, cache, fused))
+    this.enqueue(state, cache, () => this.runRefine(state, cache, fused))
     return state.current
   }
 
@@ -118,11 +119,13 @@ export class JobRunner {
       if (res.error) throw new Error(res.error)
       const refined = applyRefinement(fused, res, new Date().toISOString())
       if (refined) cache.writeJson('songmap.refined.json', refined)
+      if (state.abandoned) return
       // Gate refused ⇒ the fused timing stands; either way the reader gets
       // a ready map and the badge tells the user which one.
       state.current = { status: 'ready', songmap: refined ?? fused }
       state.running = false
     } catch (e) {
+      if (state.abandoned) return
       // Deliberately NOT written to meta.lastError: a refine failure must
       // never turn a working song into a durable error state.
       const message = (e as Error).message
@@ -172,7 +175,7 @@ export class JobRunner {
       params,
     }
     this.jobs.set(trackUri, state)
-    this.enqueue(() => this.run(state, cache))
+    this.enqueue(state, cache, () => this.run(state, cache))
     return state.current
   }
 
@@ -206,15 +209,45 @@ export class JobRunner {
       params: p,
     }
     this.jobs.set(trackUri, state)
-    this.enqueue(() => this.run(state, cache))
+    this.enqueue(state, cache, () => this.run(state, cache))
     return state.current
   }
 
-  private enqueue(work: () => Promise<void>): void {
-    this.queue = this.queue.then(work, work)
+  /** Hard per-job cap. Every stage has its own subprocess timeout, but one
+   * wedged await must never freeze the whole serialized queue. */
+  private static readonly JOB_TIMEOUT_MS = 12 * 60_000
+
+  private enqueue(state: JobState, cache: TrackCache, work: () => Promise<void>): void {
+    const guarded = async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const watchdog = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), JobRunner.JOB_TIMEOUT_MS)
+      })
+      const outcome = await Promise.race([
+        work().catch(() => undefined).then(() => 'done' as const),
+        watchdog,
+      ])
+      clearTimeout(timer)
+      if (outcome === 'timeout' && state.running) {
+        // Abandon: mark errored (durably) and free the queue. The orphaned
+        // work keeps running harmlessly — its state writes are void, and
+        // any cache files it eventually writes just answer the next request.
+        state.abandoned = true
+        const stage: Stage = state.current.status === 'working' ? state.current.stage : 'ug'
+        const message = 'this song took too long and was set aside (watchdog)'
+        const hint = 'retry — cached stages are kept, only the missing work re-runs'
+        state.current = { status: 'error', stage, message, hint }
+        state.running = false
+        const meta = cache.readMeta()
+        meta.lastError = { stage, message, hint }
+        cache.writeMeta(meta)
+      }
+    }
+    this.queue = this.queue.then(guarded, guarded)
   }
 
   private setStage(state: JobState, stage: Stage, detail: string): void {
+    if (state.abandoned) return
     state.current = { status: 'working', stage, detail }
   }
 
@@ -288,10 +321,9 @@ export class JobRunner {
       stage = 'analyze'
       let analyzer = cache.readJson<AnalyzerResult>('allin1.json')
       if (!analyzer) {
-        this.setStage(state, 'analyze', 'listening for the beat (1–2 minutes)…')
-        const outDir = cache.path('allin1-out')
-        mkdirSync(outDir, { recursive: true })
-        analyzer = await runAnalyzer(this.config, cache.path('audio.m4a'), outDir)
+        this.setStage(state, 'analyze', 'listening for the beat (2–3 minutes)…')
+        analyzer = await runAnalyzer(
+          this.config, cache.path('audio.m4a'), cache.path('allin1-out'), cache.path('allin1-work'))
         cache.writeJson('allin1.json', analyzer)
       }
       // Chroma key prior (backfills caches analyzed before it existed).
@@ -327,9 +359,13 @@ export class JobRunner {
       })
       if (fallbackReason) songmap.provenance.ug.fallbackReason = fallbackReason
       cache.writeJson('songmap.json', songmap)
+      // Late success after a watchdog abandonment still lands on disk (the
+      // next request simply finds it ready) — only the state write is void.
+      if (state.abandoned) return
       state.current = { status: 'ready', songmap }
       state.running = false
     } catch (e) {
+      if (state.abandoned) return
       const message = (e as Error).message
       const meta = cache.readMeta()
       meta.lastError = { stage, message, hint: hintFor(message) }

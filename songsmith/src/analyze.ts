@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { readFileSync, readdirSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { PACKAGE_ROOT, type SongsmithConfig } from './config'
 import type { AnalyzerResult } from './types'
@@ -58,18 +58,40 @@ export async function estimateChromaKey(
   }
 }
 
-export async function runAnalyzer(config: SongsmithConfig, audioPath: string, outDir: string): Promise<AnalyzerResult> {
+/**
+ * Run allin1 with EVERYTHING per-track. This is load-bearing: allin1 caches
+ * demixed stems and spectrograms in --demix-dir/--spec-dir keyed only by the
+ * input FILENAME STEM (default: CWD-global dirs) — with every track named
+ * audio.m4a, the global defaults made every song after the first silently
+ * reuse the first song's audio features (the great Gravity-grid poisoning).
+ * --overwrite forces honest recomputation (and sidesteps an UnboundLocalError
+ * in allin1's cleanup when a stale out-dir JSON exists); byproducts are NOT
+ * kept (~198MB/track; songsmith caches the RESULT in allin1.json, which is
+ * the right layer) and the work dir is wiped before and after.
+ */
+export async function runAnalyzer(
+  config: SongsmithConfig, audioPath: string, outDir: string, workDir: string,
+): Promise<AnalyzerResult> {
   const bin = join(config.venvDir, 'bin', 'allin1')
+  rmSync(outDir, { recursive: true, force: true })
+  rmSync(workDir, { recursive: true, force: true })
+  mkdirSync(outDir, { recursive: true })
   try {
-    await execa(bin, ['--out-dir', outDir, '--keep-byproducts', audioPath], {
-      timeout: 600_000,
-    })
+    await execa(bin, [
+      '--out-dir', outDir,
+      '--demix-dir', join(workDir, 'demix'),
+      '--spec-dir', join(workDir, 'spec'),
+      '--overwrite',
+      audioPath,
+    ], { timeout: 600_000 })
   } catch (e) {
     const msg = (e as Error).message
     if (/ENOENT/.test(msg)) {
       throw new Error(`analyzer not installed — run songsmith/setup.sh (looked for ${bin})`)
     }
     throw new Error(`allin1 failed: ${msg.slice(0, 400)}`)
+  } finally {
+    rmSync(workDir, { recursive: true, force: true })
   }
 
   // allin1 writes <audio stem>.json into outDir (a dedicated subdir — the
