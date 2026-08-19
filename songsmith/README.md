@@ -81,10 +81,14 @@ public HTTPS pages send when calling tailnet/LAN addresses.
    labeled sections; plus a Krumhansl chroma key estimate of the whole
    record (the prior that saves riff songs whose charts barely write
    chords). 1–2 minutes on Apple Silicon. Cached forever.
-4. **fuse** — UG chord sequences distributed over the downbeat grid section
-   by section; key/mode inferred (UG tonality and the chroma key as priors,
-   never vetoes); per-section key overrides for modulating bridges.
-   Warnings land in provenance.
+4. **fuse (SHEETLAY)** — the sheet owns the song's form: sections in sheet
+   order, written repeats/"play the same"/riff mentions expanded, a
+   per-song bars-per-chord unit estimated from the record's length, section
+   boundaries snapped to the analyzer's segment boundaries by a global DP
+   (analyzer labels are soft evidence only), chords placed inside each line
+   by their character offsets over the lyrics. Key/mode inferred (UG
+   tonality and the chroma key as priors, never vetoes); per-section key
+   overrides for modulating bridges. Warnings land in provenance.
 
 Errors are durable (`meta.lastError`) — the app shows them with a retry
 button instead of silently re-running; picks and track identity survive a

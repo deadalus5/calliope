@@ -1,8 +1,9 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { execa } from 'execa'
 import { analyzerVersion, estimateChromaKey, runAnalyzer, toAnalyzerResult } from './analyze'
 import { downloadAudio, MATCH_THRESHOLD, searchCandidates, videoIdFromUrl } from './audio'
-import { TrackCache } from './cache'
+import { TrackCache, trackIdOf } from './cache'
 import { PACKAGE_ROOT, type SongsmithConfig } from './config'
 import { fuse } from './fuse'
 import { autoPickTab } from './pick'
@@ -133,6 +134,27 @@ export class JobRunner {
       state.current = { status: 'error', stage: 'refine', message, hint: hintFor(message) }
       state.running = false
     }
+  }
+
+  private duplicateGridWarning(trackUri: string, analyzer: AnalyzerResult): string | null {
+    const fp = (a: AnalyzerResult) => {
+      const b = a.beatsMs
+      return `${a.bpm}:${b.length}:${b[0] ?? 0}:${b[b.length - 1] ?? 0}`
+    }
+    try {
+      const mine = fp(analyzer)
+      const myId = trackIdOf(trackUri)
+      for (const dir of readdirSync(this.config.cacheDir)) {
+        if (dir === myId) continue
+        try {
+          const other = JSON.parse(readFileSync(join(this.config.cacheDir, dir, 'allin1.json'), 'utf8')) as AnalyzerResult
+          if (fp(other) === mine) {
+            return `this song's beat analysis is IDENTICAL to another track's (${dir}) — analyzer cache aliasing; redo this song`
+          }
+        } catch { /* no analysis there */ }
+      }
+    } catch { /* cache dir unreadable — nothing to compare */ }
+    return null
   }
 
   /** Track identity from memory or the persisted meta (post-restart picks). */
@@ -358,6 +380,11 @@ export class JobRunner {
         now: new Date().toISOString(),
       })
       if (fallbackReason) songmap.provenance.ug.fallbackReason = fallbackReason
+      // Sentinel for the failure class that poisoned everything once: two
+      // different records can never legitimately share an identical beat
+      // grid — if one does, analyzer caches are aliasing again.
+      const dup = this.duplicateGridWarning(params.trackUri, analyzer)
+      if (dup) songmap.provenance.fusion.warnings.push(dup)
       cache.writeJson('songmap.json', songmap)
       // Late success after a watchdog abandonment still lands on disk (the
       // next request simply finds it ready) — only the state write is void.

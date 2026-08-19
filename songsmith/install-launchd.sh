@@ -8,11 +8,12 @@ cd "$(dirname "$0")"
 
 LABEL="com.calliope.songsmith"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-NPM="$(command -v npm)"
-if [ -z "$NPM" ]; then echo "npm not found on PATH" >&2; exit 1; fi
+if [ ! -f node_modules/tsx/dist/cli.mjs ]; then echo "run ./setup.sh first (tsx not installed)" >&2; exit 1; fi
+NODE="$(command -v node)"
+if [ -z "$NODE" ]; then echo "node not found on PATH" >&2; exit 1; fi
 
 mkdir -p logs "$HOME/Library/LaunchAgents"
-sed -e "s|__NPM__|$NPM|g" -e "s|__SONGSMITH_DIR__|$PWD|g" \
+sed -e "s|__NODE__|$NODE|g" -e "s|__SONGSMITH_DIR__|$PWD|g" \
   launchd/com.calliope.songsmith.plist.template > "$PLIST"
 
 # Refresh: boot out any old copy first (ignore "not loaded").

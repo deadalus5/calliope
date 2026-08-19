@@ -86,6 +86,9 @@ export function parseTonality(name: string, capo = 0): { root: PitchClass; minor
  * near) home, and unlike section ENDS this position is not an artifact of
  * how fusion sliced chords across analyzer segments. */
 const OPENING_BONUS_BEATS = 6
+/** The very last chord — songs end home more often than not. Kept small:
+ * fade-outs legitimately end mid-vamp (Gravity fades on the IV). */
+const CLOSING_BONUS_BEATS = 4
 
 /** Duration-weighted fraction of chord tones inside the mode, plus tonic
  * gravity. Section STARTS count double what ends do: the fuser pins a
@@ -108,6 +111,7 @@ export function fitScore(input: KeyInferInput, root: PitchClass, mode: ModeSpec)
       if (wc.sectionStart) b += TONIC_BONUS_BEATS
       if (wc.sectionEnd) b += TONIC_BONUS_BEATS / 2
       if (idx === 0) b += OPENING_BONUS_BEATS
+      if (idx === input.chords.length - 1) b += CLOSING_BONUS_BEATS
       if (b > 0) {
         // A tonic whose third agrees with the skeleton is stronger evidence.
         const third = wc.chord.quality.intervals.includes(3) ? 'minor'

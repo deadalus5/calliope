@@ -99,6 +99,23 @@ describe('inferKey', () => {
   })
 })
 
+describe('tonic gravity', () => {
+  it('a chorus that opens on the V never steals the tonic (the D-mixolydian trap)', () => {
+    // Something Like Olivia's shape: verses vamp G–C, the chorus enters on
+    // D (the V), the chart has no tonality field. D mixolydian shares every
+    // note with G ionian; only tonic gravity separates them.
+    const chords = [
+      wc('G', 8, { start: true }), wc('C', 4), wc('G', 4), wc('C', 4), wc('G', 4, { end: true }),
+      wc('D', 4, { start: true }), wc('C', 4), wc('G', 4, { end: true }),
+      wc('G', 8, { start: true }), wc('C', 4), wc('G', 4, { end: true }),
+      wc('D', 4, { start: true }), wc('C', 4), wc('G', 6, { end: true }),
+    ]
+    const r = inferKey({ chords })
+    expect(r.root).toBe(PC.G)
+    expect(r.modeId).toBe('ionian')
+  })
+})
+
 describe('audio key prior', () => {
   it('a sparse dominant-vamp chart falls to the corroborated sheet+audio root (the Superstition case)', () => {
     // The chart writes only the chorus stabs — chord fit alone hears B. The

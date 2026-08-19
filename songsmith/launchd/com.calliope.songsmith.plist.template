@@ -5,10 +5,15 @@
   <key>Label</key>
   <string>com.calliope.songsmith</string>
 
+  <!-- node running tsx's entry directly (NOT `npm start`, which doesn't
+       reliably propagate kills and orphans old servers on :8765; NOT a
+       shell wrapper, which macOS TCC blocks from user folders). launchd
+       owns the real server process. -->
   <key>ProgramArguments</key>
   <array>
-    <string>__NPM__</string>
-    <string>start</string>
+    <string>__NODE__</string>
+    <string>__SONGSMITH_DIR__/node_modules/tsx/dist/cli.mjs</string>
+    <string>src/server.ts</string>
   </array>
 
   <key>WorkingDirectory</key>
