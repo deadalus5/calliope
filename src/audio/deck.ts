@@ -152,6 +152,9 @@ export const deck = {
 
   seek(songMs: number): void {
     const clamped = Math.min(Math.max(0, songMs), spec?.durationMs ?? songMs)
+    // Seeking outside an armed loop means the user left it — disarm, or the
+    // position math would fold a playhead that never entered the loop.
+    if (loopSong && (clamped < loopSong.aMs || clamped >= loopSong.bMs)) loopSong = null
     if (playing) {
       const buf = buffers.get(rate)
       if (buf) startNode(buf, clamped)

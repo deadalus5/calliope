@@ -226,7 +226,7 @@ const HEALTH = { ok: true, ytdlpVersion: 'x', analyzerOk: true, analyzerVersion:
   else console.log('OK: section click seeks the record to 24000ms')
 
   // Chord chip click seeks too.
-  await page.click('.songmap-gridsection:nth-child(2) .songmap-chordchip:nth-child(3)') // V1's D at 16000
+  await page.click('.songmap-gridsection:nth-child(2) .songmap-chipwrap:nth-child(3) .songmap-chordchip') // V1's D at 16000
   await page.waitForTimeout(300)
   const seeks2 = await page.evaluate(() => window.__seeks)
   if (!seeks2.some((ms) => Math.abs(ms - 16_000) < 50)) fail(`chord click did not seek to 16000 (seeks: ${JSON.stringify(seeks2)})`)
